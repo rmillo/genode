@@ -25,6 +25,8 @@
 #include <nova/syscalls.h>
 #include <nova_util.h> /* map_local */
 
+static bool verbose_oom = false;
+
 using namespace Genode;
 using namespace Nova;
 
@@ -409,9 +411,12 @@ void Pager_object::cleanup_call()
 
 
 static uint8_t create_portal(addr_t pt, addr_t pd, addr_t ec, Mtd mtd,
-                             addr_t eip, addr_t localname)
+                             addr_t eip, addr_t localname, Pager_object * obj)
 {
-	uint8_t res = create_pt(pt, pd, ec, mtd, eip);
+	uint8_t res;
+	do {
+		res = create_pt(pt, pd, ec, mtd, eip);
+	} while (res == Nova::NOVA_PD_OOM && Nova::NOVA_OK == obj->handle_oom());
 
 	if (res != NOVA_OK)
 		return res;
@@ -444,7 +449,7 @@ void Exception_handlers::register_handler(Pager_object *obj, Mtd mtd,
 	addr_t entry = func ? (addr_t)func : (addr_t)(&_handler<EV>);
 	uint8_t res = create_portal(obj->exc_pt_sel_client() + EV,
 	                            __core_pd_sel, ec_sel, mtd, entry,
-	                            reinterpret_cast<addr_t>(obj));
+	                            reinterpret_cast<addr_t>(obj), obj);
 	if (res != Nova::NOVA_OK)
 		throw Rm_session::Invalid_thread();
 }
@@ -492,6 +497,29 @@ Exception_handlers::Exception_handlers(Pager_object *obj)
 /******************
  ** Pager object **
  ******************/
+
+
+void Pager_object::dump_kernel_quota_usage(Pager_object *obj)
+{
+	if (obj == (Pager_object *)~0UL) {
+		unsigned use_cpu = location.xpos();
+		obj = pager_threads[use_cpu]->ep(0)->first();
+		PINF("-- kernel memory usage of Genode PDs --");
+	}
+
+	if (!obj)
+		return;
+
+	addr_t limit = 0; addr_t usage = 0;
+	Nova::pd_ctrl_debug(obj->pd_sel(), limit, usage);
+
+	char const * thread_name = reinterpret_cast<char const *>(obj->badge());
+	PINF("pd=0x%lx pager=%p thread='%s' limit=0x%lx usage=0x%lx",
+	     obj->pd_sel(), obj, thread_name, limit, usage);
+
+	dump_kernel_quota_usage(static_cast<Pager_object *>(obj->child(Genode::Avl_node_base::LEFT)));
+	dump_kernel_quota_usage(static_cast<Pager_object *>(obj->child(Genode::Avl_node_base::RIGHT)));
+}
 
 
 Pager_object::Pager_object(unsigned long badge, Affinity::Location location)
@@ -553,7 +581,7 @@ Pager_object::Pager_object(unsigned long badge, Affinity::Location location)
 	/* create portal for final cleanup call used during destruction */
 	res = create_portal(sel_pt_cleanup(), pd_sel, ec_sel, Mtd(0),
 	                    reinterpret_cast<addr_t>(_invoke_handler),
-	                    reinterpret_cast<addr_t>(this));
+	                    reinterpret_cast<addr_t>(this), this);
 	if (res != Nova::NOVA_OK) {
 		PERR("could not create pager cleanup portal, error = %u\n", res);
 		throw Rm_session::Invalid_thread();
@@ -590,6 +618,190 @@ Pager_object::~Pager_object()
 	/* revoke vCPU exception portals */
 	revoke(Obj_crd(_client_exc_vcpu, NUM_INITIAL_VCPU_PT_LOG2));
 	cap_map()->remove(_client_exc_vcpu, NUM_INITIAL_VCPU_PT_LOG2, false);
+}
+
+
+uint8_t Pager_object::handle_oom(addr_t transfer_from,
+                                 char const * src_pd, char const * src_thread,
+                                 enum Pager_object::POLICY policy)
+{
+	const char * dst_pd     = "unknown";
+	const char * dst_thread = reinterpret_cast<char *>(badge());
+
+	enum { QUOTA_TRANSFER_PAGES = 2 };
+
+	if (transfer_from == ~0UL)
+		transfer_from = __core_pd_sel;
+
+	/* request current kernel quota usage of target pd */
+	addr_t limit_before = 0, usage_before = 0;
+	Nova::pd_ctrl_debug(pd_sel(), limit_before, usage_before);
+
+	if (verbose_oom) {
+		addr_t limit_source = 0, usage_source = 0;
+		/* request current kernel quota usage of source pd */
+		Nova::pd_ctrl_debug(transfer_from, limit_source, usage_source);
+
+		PINF("oom - '%s:%s' (%lu/%lu) - transfer %u pages from '%s:%s' (%lu/%lu)",
+		     dst_pd, dst_thread,
+		     usage_before, limit_before, QUOTA_TRANSFER_PAGES,
+		     src_pd, src_thread, usage_source, limit_source);
+	}
+
+	/* upgrade quota */
+	uint8_t res = Nova::pd_ctrl(transfer_from, Pd_op::TRANSFER_QUOTA,
+	                            pd_sel(), QUOTA_TRANSFER_PAGES);
+	if (res == Nova::NOVA_OK)
+		return res;
+
+	/* retry upgrade using core quota if policy permits */
+	if (policy == UPGRADE_PREFER_SRC_TO_DST && transfer_from != __core_pd_sel) {
+		res = Nova::pd_ctrl(__core_pd_sel, Pd_op::TRANSFER_QUOTA,
+		                    pd_sel(), QUOTA_TRANSFER_PAGES);
+		if (res == Nova::NOVA_OK)
+			return res;
+	}
+
+	PWRN("upgrade failed - stop thread, free up kernel memory & resume '%s:%s'",
+	     dst_pd, dst_thread);
+
+	/* if nothing helps try to revoke memory */
+	enum { REMOTE_REVOKE = true, PD_SELF = true };
+	Mem_crd crd_all(0, ~0U, Rights(true, true, true));
+	res = Nova::revoke(crd_all, PD_SELF, REMOTE_REVOKE,
+	                   pd_sel(), sel_sm_block());
+
+	/* timeout means the rcu period for the revoked memory is over */
+	if (res == Nova::NOVA_TIMEOUT) {
+		/* re-request current kernel quota usage of target pd */
+		addr_t limit_after = 0, usage_after = 0;
+		Nova::pd_ctrl_debug(pd_sel(), limit_after, usage_after);
+		/* if we could free up memory we continue */
+		if (usage_after < usage_before)
+			return Nova::NOVA_OK;
+
+		PERR("before/after - limit: 0x%lu/0x%lu - usage: 0x%lu/0x%lu",
+		     limit_before, limit_after, usage_before, usage_after);
+	}
+
+	PERR("Upgrading kernel memory of PD failed, "
+	     "policy %u, error %u - stop thread", policy, res);
+
+	return Nova::NOVA_PD_OOM;
+}
+
+
+void Pager_object::_oom_handler(addr_t pager_dst, addr_t pager_src,
+                                addr_t reason)
+{
+	if (sizeof(void *) == 4) {
+		/* On 32 bit edx and ecx as second and third regparm parameter is not
+		 * available. It is used by the kernel internally to store ip/sp.
+		 */
+		asm volatile ("" : "=D" (pager_src));
+		asm volatile ("" : "=S" (reason));
+	}
+
+	Thread_base  * myself  = Thread_base::myself();
+	Utcb         * utcb    = reinterpret_cast<Utcb *>(myself->utcb());
+	Pager_object * obj_dst = reinterpret_cast<Pager_object *>(pager_dst);
+	Pager_object * obj_src = reinterpret_cast<Pager_object *>(pager_src);
+
+	enum OOM {
+		SEND = 1, REPLY = 2, SELF = 4,
+		SRC_CORE_PD = ~0UL, SRC_PD_UNKNOWN = 0,
+	};
+
+	enum POLICY {
+		STOP = 1,
+		UPGRADE_CORE_TO_DST = 2,
+		UPGRADE_PREFER_SRC_TO_DST = 3,
+		QUOTA_TRANSFER_PAGES = 2,
+	} policy = POLICY::UPGRADE_CORE_TO_DST;
+
+	addr_t items_wanted = utcb->items;
+	if (items_wanted & 0xFFFFUL) {
+		PERR("unimplemented - save words - stop thread");
+		utcb->set_msg_word(0);
+		reply(myself->stack_top(), myself->tid().exc_pt_sel + Nova::SM_SEL_EC);
+	}
+
+	if (pager_dst == 0 || pager_dst == ~0UL || ((reason & SELF) && (reason & SEND))) {
+		PERR("unknown oom state - stop thread"); /* should not happen */
+		utcb->set_msg_word(0);
+		reply(myself->stack_top(), myself->tid().exc_pt_sel + Nova::SM_SEL_EC);
+	}
+
+	if (((policy == UPGRADE_PREFER_SRC_TO_DST) && (pager_dst == pager_src)) ||
+		(policy == STOP)) {
+		PERR("PD has insufficient kernel memory left - stop thread");
+		utcb->set_msg_word(0);
+		/* in case of (reason == OOM::REPLY) the server get stopped !!! XXX */
+		reply(myself->stack_top(), obj_dst->sel_sm_block());
+	}
+
+	char const * src_pd     = "core";
+	char const * src_thread = "unknown";
+
+	addr_t transfer_from = ~0UL;
+
+	switch (pager_src) {
+	case SRC_PD_UNKNOWN:
+		/* should not happen on Genode - we create and know every PD in core */
+		PERR("Unknown PD has insufficient kernel memory left - stop thread");
+		utcb->set_msg_word(0);
+		reply(myself->stack_top(), myself->tid().exc_pt_sel + Nova::SM_SEL_EC );
+	case SRC_CORE_PD:
+		/* core PD -> other PD, which has insufficient kernel resources */
+
+		if (reason & SELF)
+			src_thread = "pager";
+		else
+			/* case that src thread != this thread in core */
+			utcb->set_msg_word(0);
+
+		transfer_from = __core_pd_sel;
+		break;
+	default:
+		/* non core PD -> non core PD */
+		src_pd = "unknown";
+
+		utcb->set_msg_word(0);
+		/* attempt to delegate items between different PDs */
+		if (pager_src == pager_dst || policy == UPGRADE_CORE_TO_DST)
+			transfer_from = __core_pd_sel;
+		else {
+			src_thread = reinterpret_cast<char *>(obj_src->badge());
+			transfer_from = obj_src->pd_sel();
+		}
+	}
+
+	if (obj_dst->handle_oom(transfer_from, src_pd, src_thread) == Nova::NOVA_OK)
+		/* handling succeeded - continue with original IPC */
+		reply(myself->stack_top());
+
+	/* handling oom of thread failed - stop it */
+	utcb->set_msg_word(0);
+	reply(myself->stack_top(), obj_dst->sel_sm_block());
+}
+
+
+addr_t Pager_object::get_oom_portal()
+{
+	addr_t const pt_oom     = sel_oom_portal();
+	addr_t const local_name = reinterpret_cast<addr_t>(this);
+
+	unsigned const use_cpu  = location.xpos();
+	addr_t const ec_sel     = pager_threads[use_cpu]->tid().ec_sel;
+
+	uint8_t res = create_portal(pt_oom, __core_pd_sel, ec_sel, Mtd(0),
+	                            reinterpret_cast<addr_t>(_oom_handler),
+	                            local_name, this);
+	if (res == Nova::NOVA_OK)
+		return pt_oom;
+
+	PERR("creating portal for out of memory notification failed");
+	return 0;
 }
 
 

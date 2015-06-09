@@ -61,7 +61,7 @@ static void echo_reply()
 
 Echo::Echo(Genode::addr_t utcb_addr)
 :
-	_ec_sel(Genode::cap_map()->insert()),
+	_ec_sel(Genode::cap_map()->insert(1)),
 	_pt_sel(Genode::cap_map()->insert()),
 	_utcb((Nova::Utcb *)utcb_addr)
 {

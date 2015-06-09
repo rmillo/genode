@@ -120,11 +120,14 @@ namespace Genode {
 			Thread_capability  _thread_cap;
 			Exception_handlers _exceptions;
 
+			addr_t             _pd;
+
 			void _copy_state(Nova::Utcb * utcb);
 
 			addr_t sel_pt_cleanup() { return _selectors; }
 			addr_t sel_sm_notify()  { return _selectors + 1; }
 			addr_t sel_sm_block()   { return _selectors + 2; }
+			addr_t sel_oom_portal() { return _selectors + 3; }
 
 			__attribute__((regparm(1)))
 			static void _page_fault_handler(addr_t pager_obj);
@@ -137,6 +140,9 @@ namespace Genode {
 
 			__attribute__((regparm(1)))
 			static void _recall_handler(addr_t pager_obj);
+
+			__attribute__((regparm(3)))
+			static void _oom_handler(addr_t, addr_t, addr_t);
 
 		public:
 
@@ -158,6 +164,13 @@ namespace Genode {
 			{
 				_exception_sigh = sigh;
 			}
+
+			/**
+			 * Assign PD selector to PD
+			 */
+			void assign_pd(addr_t pd_sel) { _pd = pd_sel; }
+			addr_t pd_sel() const { return _pd; }
+			void dump_kernel_quota_usage(Pager_object * = (Pager_object *)~0UL);
 
 			void exception(uint8_t exit_id);
 
@@ -301,6 +314,24 @@ namespace Genode {
 			{
 				_client_exc_vcpu = cap_map()->insert(Nova::NUM_INITIAL_VCPU_PT_LOG2);
 			}
+
+			/**
+			 * Portal called by thread that causes a out of memory in kernel.
+			 */
+			addr_t get_oom_portal();
+
+			enum POLICY {
+				STOP = 1,
+				UPGRADE_CORE_TO_DST = 2,
+				UPGRADE_PREFER_SRC_TO_DST = 3,
+			};
+
+			/**
+			 * Implements policy on how to react on out of memory in kernel.
+			 */
+			uint8_t handle_oom(addr_t = ~0UL, const char * = "core",
+			                   const char * = "unknown",
+			                   POLICY = POLICY::UPGRADE_CORE_TO_DST);
 	};
 
 	/**
@@ -336,7 +367,7 @@ namespace Genode {
 			 * This function is only called by the 'Pager_entrypoint'
 			 * constructor.
 			 */
-			void ep(Pager_entrypoint *ep) { _ep = ep; }
+			Pager_entrypoint * ep(Pager_entrypoint *ep) { if(ep) _ep = ep; return _ep; }
 
 			/**
 			 * Thread interface

@@ -199,9 +199,11 @@ namespace Nova {
 
 
 	ALWAYS_INLINE
-	inline uint8_t create_pd(unsigned pd0, unsigned pd, Crd crd)
+	inline uint8_t create_pd(unsigned pd0, unsigned pd, Crd crd,
+	                         unsigned short lower_limit, unsigned upper_limit)
 	{
-		return syscall_2(NOVA_CREATE_PD, 0, pd0, pd, crd.value());
+		return syscall_3(NOVA_CREATE_PD, 0, pd0, pd, crd.value(),
+		                 upper_limit << 16 | lower_limit);
 	}
 
 
@@ -266,9 +268,16 @@ namespace Nova {
 
 
 	ALWAYS_INLINE
-	inline uint8_t revoke(Crd crd, bool self = true)
+	inline uint8_t revoke(Crd crd, bool self = true, bool remote = false,
+	                      mword_t pd = 0, mword_t sm = 0)
 	{
-		return syscall_1(NOVA_REVOKE, self, 0, crd.value());
+		uint8_t flags = self ? 0x1 : 0;
+
+		if (remote)
+			flags |= 0x2;
+
+		mword_t value_crd = crd.value();
+		return syscall_5(NOVA_REVOKE, flags, sm, value_crd, pd);
 	}
 
 
@@ -305,6 +314,21 @@ namespace Nova {
 	inline uint8_t si_ctrl(mword_t sm, Sem_op op, mword_t &value, mword_t &cnt)
 	{
 		return syscall_5(NOVA_SM_CTRL, op, sm, value, cnt);
+	}
+
+
+	ALWAYS_INLINE
+	inline uint8_t pd_ctrl(mword_t pd_src, Pd_op op, mword_t pd_dst,
+	                       mword_t transfer)
+	{
+		return syscall_5(NOVA_PD_CTRL, op, pd_src, pd_dst, transfer);
+	}
+
+
+	ALWAYS_INLINE
+	inline uint8_t pd_ctrl_debug(mword_t pd, mword_t &limit, mword_t &usage)
+	{
+		return syscall_5(NOVA_PD_CTRL, Pd_op::DEBUG, pd, limit, usage);
 	}
 
 
