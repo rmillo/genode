@@ -39,7 +39,7 @@ void test_server_oom()
 	Test::Client     client(session_cap);
 
 	/* case that during reply we get oom */
-	for (unsigned i = 0; i < 60000; i++) {
+	for (unsigned i = 0; i < 20000; i++) {
 		Genode::Native_capability got_cap = client.void_cap();
 
 		if (!got_cap.valid()) {
@@ -57,7 +57,7 @@ void test_server_oom()
 	}
 
 	/* case that during send we get oom */
-	for (unsigned i = 0; i < 60000; i++) {
+	for (unsigned i = 0; i < 20000; i++) {
 		/* be evil and switch translation off - server ever uses a new selector */
 		Genode::Native_capability send_cap = session_cap;
 		send_cap.solely_map();
