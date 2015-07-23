@@ -46,6 +46,7 @@ include $(GEN_CORE_DIR)/version.inc
 
 vpath main.cc                      $(GEN_CORE_DIR)
 vpath ram_session_component.cc     $(GEN_CORE_DIR)
+vpath rom_session_component.cc     $(GEN_CORE_DIR)
 vpath cpu_session_component.cc     $(GEN_CORE_DIR)
 vpath pd_session_component.cc      $(GEN_CORE_DIR)
 vpath rm_session_component.cc      $(GEN_CORE_DIR)
