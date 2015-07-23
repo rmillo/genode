@@ -269,20 +269,29 @@ static void test_create_as_many_threads()
 	                   Native_config::context_virtual_size();
 
 	static Cpu_helper * threads[max];
+	static char thread_name[8];
 
-	for (unsigned i = 0; i < max; i++) {
-		try {
-			threads[i] = new (env()->heap()) Cpu_helper("a", env()->cpu_session());
-			threads[i]->start();
-			threads[i]->join();
-		} catch (Genode::Thread_base::Context_alloc_failed) {
-			PINF("created %u threads before I got Context_alloc_failed", i);
-			for (unsigned j = i; j > 0; j--) {
-				destroy(env()->heap(), threads[j - 1]);
-				threads[j - 1] = nullptr;
+	unsigned i = 0;
+	try {
+		for (; i < max; i++) {
+			try {
+				snprintf(thread_name, sizeof(thread_name), "%u", i + 1);
+				threads[i] = new (env()->heap()) Cpu_helper(thread_name, env()->cpu_session());
+				threads[i]->start();
+				threads[i]->join();
+			} catch (Cpu_session::Thread_creation_failed) {
+				throw "Thread_creation_failed";
+			} catch (Thread_base::Context_alloc_failed) {
+				throw "Context_alloc_failed";
 			}
-			return;
 		}
+	} catch (const char * ex) {
+		PINF("created %u threads before I got '%s'", i, ex);
+		for (unsigned j = i; j > 0; j--) {
+			destroy(env()->heap(), threads[j - 1]);
+			threads[j - 1] = nullptr;
+		}
+		return;
 	}
 
 	/*
