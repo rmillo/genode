@@ -165,7 +165,7 @@ namespace Nova {
 	/**
 	 * Pd operations
 	 */
-	enum Pd_op { TRANSFER_QUOTA = 0U, DEBUG = 2U };
+	enum Pd_op { TRANSFER_QUOTA = 0U, PD_DEBUG = 2U };
 
 
 	class Descriptor

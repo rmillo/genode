@@ -328,7 +328,7 @@ namespace Nova {
 	ALWAYS_INLINE
 	inline uint8_t pd_ctrl_debug(mword_t pd, mword_t &limit, mword_t &usage)
 	{
-		return syscall_5(NOVA_PD_CTRL, Pd_op::DEBUG, pd, limit, usage);
+		return syscall_5(NOVA_PD_CTRL, Pd_op::PD_DEBUG, pd, limit, usage);
 	}
 
 
