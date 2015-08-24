@@ -241,7 +241,6 @@ extern "C" void module_ehci_exynos_init();
 extern "C" int  module_usbnet_init();
 extern "C" int  module_smsc95xx_driver_init();
 
-
 void ehci_setup(Services *services)
 {
 

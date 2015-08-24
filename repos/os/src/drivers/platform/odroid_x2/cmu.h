@@ -147,7 +147,6 @@ class Cmu : public Regulator::Driver,
 		struct Clk_gate_ip_acp   : Register<0x0900, 32> { };
 		struct Clk_gate_ip_isp0  : Register<0x8800, 32> { };
 		struct Clk_gate_ip_isp1  : Register<0x8804, 32> { };
-
 		
 
 		/***********************
