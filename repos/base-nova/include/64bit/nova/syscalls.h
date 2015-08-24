@@ -136,7 +136,7 @@ namespace Nova {
 	ALWAYS_INLINE
 	inline uint8_t call(mword_t pt)
 	{
-		return syscall_0(NOVA_CALL, 0, pt);
+		return syscall_1(NOVA_CALL, 0, pt, 0);
 	}
 
 
@@ -164,11 +164,26 @@ namespace Nova {
 	}
 
 
+	/**
+	 * Create an EC.
+	 *
+	 * \param ec     two selectors - ec && ec + 1
+	 *               First selector must be unused and second selector is
+	 *               either unused or must be a valid portal selector.
+	 *               The thread will call this portal if the PD it runs in runs
+	 *               out of kernel memory.
+	 * \param pd     selector of PD the EC will created in
+	 * \param cpu    CPU number the EC will run on
+	 * \param utcb   PD local address where the UTCB of the EC will be appear
+	 * \param esp    initial stack address
+	 * \param evt    base selector for all exception portals of the EC
+	 * \param global if true  - thread requires a SC to be runnable
+	 *               if false - thread is runnable solely if it receives a IPC
+	 *                          (worker thread)
+	 */
 	ALWAYS_INLINE
-	inline uint8_t create_ec(mword_t ec, mword_t pd,
-	                         mword_t cpu, mword_t utcb,
-	                         mword_t esp, mword_t evt,
-	                         bool global = 0)
+	inline uint8_t create_ec(mword_t ec, mword_t pd, mword_t cpu, mword_t utcb,
+	                         mword_t esp, mword_t evt, bool global = false)
 	{
 		return syscall_4(NOVA_CREATE_EC, global, ec, pd,
 		                 (cpu & 0xfff) | (utcb & ~0xfff),
@@ -224,8 +239,21 @@ namespace Nova {
 	}
 
 
+	/**
+	 * Revoke memory, capabilities or i/o ports from a PD
+	 *
+	 * \param crd    describes region and type of resource
+	 * \param self   also revoke from source PD iif self == true
+	 * \param remote if true the 'pd' parameter below is used, otherwise
+	 *               current PD is used as source PD
+	 * \param pd     selector describing remote PD
+	 * \param sm     SM selector which gets an up() by the kernel if the
+	 *               memory of the current revoke invocation gets freed up
+	 *               (end of RCU period)
+	 */
 	ALWAYS_INLINE
-	inline uint8_t revoke(Crd crd, bool self = true, bool remote = false, mword_t pd = 0, mword_t sm = 0)
+	inline uint8_t revoke(Crd crd, bool self = true, bool remote = false,
+	                      mword_t pd = 0, mword_t sm = 0)
 	{
 		uint8_t flags = self ? 0x1 : 0;
 
