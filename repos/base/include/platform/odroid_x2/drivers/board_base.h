@@ -35,11 +35,46 @@ struct Genode::Board_base : Exynos4
 
 		/* power management unit */
 		PMU_MMIO_BASE = 0x10020000,
+		PMU_MMIO_SIZE = 0x5000, // TODO Check the region size
 
-		PMU_MMIO_SIZE = 0x5000,
+		/* UART */
+		UART_1_MMIO_BASE = 0x13810000,
+		UART_1_IRQ       = 85,
+		UART_1_CLOCK     = 100000000, // TODO Check SCLK_UART1
 
-		/* USB HOST interrupt */
-		USB_HOST20_IRQ = 102,
+		UART_2_MMIO_BASE = 0x13820000,
+		UART_2_IRQ       = 86,
+		UART_2_CLOCK     = 100000000, // TODO Check SCLK_UART2
+
+		MCT_IRQ_L0    = 28,
+		MCT_IRQ_L1    = 28,
+		MCT_IRQ_L2    = 28,
+		MCT_IRQ_L3    = 28,
+
+		TIMER_IRQ = 28,
+
+		USB_HOST20_IRQ = 102, //TODO Check value
+
+		/*GPIO*/
+		GPIO1_MMIO_BASE = 0x11400000,
+		GPIO1_MMIO_SIZE = 0x0F88,
+		GPIO1_IRQ       = 79,  //TODO Check the irq number
+
+		GPIO2_MMIO_BASE = 0x11000000,
+		GPIO2_MMIO_SIZE = 0x0F88,
+		GPIO2_IRQ       = 79,//TODO Check the irq number
+
+		GPIO3_MMIO_BASE = 0x03860000,
+		GPIO3_MMIO_SIZE = 0x0F88,
+		GPIO3_IRQ       = 79,//TODO Check the irq number
+
+		GPIO4_MMIO_BASE = 0x106E0000,
+		GPIO4_MMIO_SIZE = 0x0F88,
+		GPIO4_IRQ       = 79,//TODO Check the irq number
+
+
+		/* wether board provides security extension */
+		SECURITY_EXTENSION = 0, // TODO Check this value
 	};
 };
 
