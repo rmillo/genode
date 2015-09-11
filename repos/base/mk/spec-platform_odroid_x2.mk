@@ -7,7 +7,7 @@
 #
 
 # denote specs that are fullfilled by this spec
-SPECS +=  exynos4 cortex_a9 usb
+SPECS +=  exynos4 cortex_a9 usb framebuffer
 
 # add repository relative paths
 REP_INC_DIR += include/platform/odroid_x2
