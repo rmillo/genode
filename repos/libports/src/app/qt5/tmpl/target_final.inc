@@ -25,6 +25,12 @@ QT_DEFINES += -DQT_GUI_LIB
 LIBS += qt5_gui qt5_qpa_nitpicker qt5_widgets
 endif
 
+# QtWidgets
+ifeq ($(findstring widgets, $(QT)), widgets)
+QT_DEFINES += -DQT_GUI_LIB
+LIBS += qt5_gui qt5_qpa_nitpicker qt5_widgets
+endif
+
 # QtNetwork
 ifeq ($(findstring network, $(QT)), network)
 LIBS += qt5_network

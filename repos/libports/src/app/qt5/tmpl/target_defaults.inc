@@ -1,7 +1,7 @@
 # build with QtCore and QtGui support by default
 # - can be overridden in the qmake project file
 
-QT = core gui
+QT = core
 
 # find out the name of the project directory
 
