@@ -13,14 +13,31 @@ QT_SOURCES += qprocess_genode.cpp \
 
 # remove unsupported UNIX-specific files
 QT_SOURCES_FILTER_OUT = \
+  qtstorageinfo.cpp \
+  qeventdispatcher_glib.cpp \
+  qfilesystemwatcher_inotify.cpp \
   qprocess_unix.cpp \
   qthread_unix.cpp \
-  qfilesystemwatcher_inotify.cpp \
-  moc_qfilesystemwatcher_inotify_p.cpp \
+  adler32.c \
+  compress.c \
+  crc32.c \
+  deflate.c \
+  gzclose.c \
+  gzlib.c \
+  gzread.c \
+  gzwrite.c \
+  infback.c \
+  inffast.c \
+  inflate.c \
+  inftrees.c \
+  trees.c \
+  uncompr.c \
+  zutil.c \
 
 # remove unneeded files to prevent moc warnings
 COMPILER_MOC_HEADER_MAKE_ALL_FILES_FILTER_OUT = \
   moc_qsharedmemory.cpp \
+  moc_qeventdispatcher_glib_p.cpp \
   moc_qfilesystemwatcher_inotify_p.cpp \
 
 include $(REP_DIR)/lib/mk/qt5.inc

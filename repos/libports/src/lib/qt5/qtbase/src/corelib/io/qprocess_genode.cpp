@@ -363,7 +363,7 @@ void QProcessPrivate::destroyPipe(int *pipe)
 #endif /* Q_OS_GENODE */
 }
 
-void QProcessPrivate::destroyChannel(Channel *channel)
+void QProcessPrivate::closeChannel(Channel *channel)
 {
 #ifdef Q_OS_GENODE
 #if defined QPROCESS_DEBUG
@@ -379,7 +379,7 @@ void QProcessPrivate::destroyChannel(Channel *channel)
 
     This function must be called in order: stdin, stdout, stderr
 */
-bool QProcessPrivate::createChannel(Channel &channel)
+bool QProcessPrivate::openChannel(Channel &channel)
 {
 #ifdef Q_OS_GENODE
 #if defined QPROCESS_DEBUG
@@ -962,7 +962,7 @@ bool QProcessPrivate::processStarted()
 #endif /* Q_OS_GENODE */
 }
 
-qint64 QProcessPrivate::bytesAvailableFromStdout() const
+qint64 QProcessPrivate::bytesAvailableInChannel(const Channel *channel) const
 {
 #ifdef Q_OS_GENODE
 #if defined QPROCESS_DEBUG
@@ -970,66 +970,37 @@ qint64 QProcessPrivate::bytesAvailableFromStdout() const
 #endif
     return 0;
 #else
+    Q_ASSERT(channel->pipe[0] != INVALID_Q_PIPE);
     int nbytes = 0;
     qint64 available = 0;
-    if (::ioctl(stdoutChannel.pipe[0], FIONREAD, (char *) &nbytes) >= 0)
+    if (::ioctl(channel->pipe[0], FIONREAD, (char *) &nbytes) >= 0)
         available = (qint64) nbytes;
 #if defined (QPROCESS_DEBUG)
-    qDebug("QProcessPrivate::bytesAvailableFromStdout() == %lld", available);
+    qDebug("QProcessPrivate::bytesAvailableInChannel(%d) == %lld", channel - &stdinChannel, available);
 #endif
     return available;
 #endif /* Q_OS_GENODE */
 }
 
-qint64 QProcessPrivate::bytesAvailableFromStderr() const
+qint64 QProcessPrivate::readFromChannel(const Channel *channel, char *data, qint64 maxlen)
 {
 #ifdef Q_OS_GENODE
 #if defined QPROCESS_DEBUG
-    qDebug() << "QProcessPrivate::bytesAvailableFromStderr()";
+    qDebug() << "QProcessPrivate::readFromChannel()";
 #endif
     return 0;
 #else
-    int nbytes = 0;
-    qint64 available = 0;
-    if (::ioctl(stderrChannel.pipe[0], FIONREAD, (char *) &nbytes) >= 0)
-        available = (qint64) nbytes;
-#if defined (QPROCESS_DEBUG)
-    qDebug("QProcessPrivate::bytesAvailableFromStderr() == %lld", available);
-#endif
-    return available;
-#endif /* Q_OS_GENODE */
-}
-
-qint64 QProcessPrivate::readFromStdout(char *data, qint64 maxlen)
-{
-#ifdef Q_OS_GENODE
+    Q_ASSERT(channel->pipe[0] != INVALID_Q_PIPE);
+    qint64 bytesRead = qt_safe_read(channel->pipe[0], data, maxlen);
 #if defined QPROCESS_DEBUG
-    qDebug() << "QProcessPrivate::readFromStdout()";
-#endif
-    return 0;
-#else
-    qint64 bytesRead = qt_safe_read(stdoutChannel.pipe[0], data, maxlen);
-#if defined QPROCESS_DEBUG
-    qDebug("QProcessPrivate::readFromStdout(%p \"%s\", %lld) == %lld",
+    int save_errno = errno;
+    qDebug("QProcessPrivate::readFromChannel(%d, %p \"%s\", %lld) == %lld",
+           channel - &stdinChannel,
            data, qt_prettyDebug(data, bytesRead, 16).constData(), maxlen, bytesRead);
+    errno = save_errno;
 #endif
-    return bytesRead;
-#endif /* Q_OS_GENODE */
-}
-
-qint64 QProcessPrivate::readFromStderr(char *data, qint64 maxlen)
-{
-#ifdef Q_OS_GENODE
-#if defined QPROCESS_DEBUG
-    qDebug() << "QProcessPrivate::readFromStderr()";
-#endif
-    return 0;
-#else
-    qint64 bytesRead = qt_safe_read(stderrChannel.pipe[0], data, maxlen);
-#if defined QPROCESS_DEBUG
-    qDebug("QProcessPrivate::readFromStderr(%p \"%s\", %lld) == %lld",
-           data, qt_prettyDebug(data, bytesRead, 16).constData(), maxlen, bytesRead);
-#endif
+    if (bytesRead == -1 && errno == EWOULDBLOCK)
+        return -2;
     return bytesRead;
 #endif /* Q_OS_GENODE */
 }
@@ -1414,9 +1385,6 @@ bool QProcessPrivate::waitForDeadChild()
 #endif /* Q_OS_GENODE */
 }
 
-void QProcessPrivate::_q_notified()
-{
-}
 
 #if defined(Q_OS_QNX)
 bool QProcessPrivate::startDetached(const QString &program, const QStringList &arguments, const QString &workingDirectory, qint64 *pid)
@@ -1575,7 +1543,7 @@ bool QProcessPrivate::startDetached(const QString &program, const QStringList &a
 }
 #endif
 
-void QProcessPrivate::initializeProcessManager()
+/*void QProcessPrivate::initializeProcessManager()
 {
 #ifdef Q_OS_GENODE
 #ifdef QPROCESS_DEBUG
@@ -1583,8 +1551,8 @@ void QProcessPrivate::initializeProcessManager()
 #endif
 #else
     (void) processManager();
-#endif /* Q_OS_GENODE */
-}
+#endif /* Q_OS_GENODE
+}*/
 
 QT_END_NAMESPACE
 

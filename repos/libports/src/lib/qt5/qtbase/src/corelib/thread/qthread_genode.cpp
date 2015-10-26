@@ -241,10 +241,10 @@ void QThreadData::clearCurrentThreadData()
     clear_thread_data();
 }
 
-QThreadData *QThreadData::current()
+QThreadData *QThreadData::current(bool createIfNecessary)
 {
     QThreadData *data = get_thread_data();
-    if (!data) {
+    if (!data && createIfNecessary) {
         data = new QThreadData;
         QT_TRY {
             set_thread_data(data);
@@ -301,11 +301,11 @@ void QThreadPrivate::createEventDispatcher(QThreadData *data)
     data->eventDispatcher.storeRelease(new QEventDispatcherBlackberry);
 #else
 #if !defined(QT_NO_GLIB)
-    if (qEnvironmentVariableIsEmpty("QT_NO_GLIB")
+    /*if (qEnvironmentVariableIsEmpty("QT_NO_GLIB")
         && qEnvironmentVariableIsEmpty("QT_NO_THREADED_GLIB")
         && QEventDispatcherGlib::versionSupported())
         data->eventDispatcher.storeRelease(new QEventDispatcherGlib);
-    else
+    else*/
 #endif
     data->eventDispatcher.storeRelease(new QEventDispatcherUNIX);
 #endif
