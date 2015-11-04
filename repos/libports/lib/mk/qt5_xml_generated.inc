@@ -3,17 +3,17 @@ QT_DEFINES += -DQT_NO_LIBUDEV -DQT_NO_XCB -DQT_NO_XKBCOMMON -DQT_NO_USING_NAMESP
 QT_INCPATH += \
   qtbase/include \
   qtbase/include/QtCore \
-  qtbase/include/QtCore/5.1.0 \
-  qtbase/include/QtCore/5.1.0/QtCore \
+  qtbase/include/QtCore/5.5.0 \
+  qtbase/include/QtCore/5.5.0/QtCore \
   qtbase/include/QtXml \
-  qtbase/include/QtXml/5.1.0 \
-  qtbase/include/QtXml/5.1.0/QtXml \
+  qtbase/include/QtXml/5.5.0 \
+  qtbase/include/QtXml/5.5.0/QtXml \
   qtbase/mkspecs/genode-g++ \
   qtbase/src/xml \
 
 QT_SOURCES += \
   qdom.cpp \
-  qxml.cpp 
+  qxml.cpp
 
 QT_VPATH += \
   qtbase/src/xml/dom \
@@ -26,11 +26,11 @@ QT_VPATH += \
 # extracted from 'compiler_moc_header_make_all' target
 
 COMPILER_MOC_HEADER_MAKE_ALL_FILES = \
- 
+
 
 # source files generated from existing source files ('%.moc: %.cpp' rule in import-qt5.inc)
 # extracted from 'compiler_moc_source_make_all' rule
 
 COMPILER_MOC_SOURCE_MAKE_ALL_FILES = \
- 
+
 
