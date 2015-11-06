@@ -12,7 +12,7 @@ if {[have_spec hw_odroid_xu]} {
 append build_components [qt5_build_components feature]
 
 append build_components {
-	app/qt5/examples/textedit
+	app/qt5/examples/widgets/tools/undo
 }
 
 set use_sd_card_driver [expr [have_spec omap4] || [have_spec arndale]]
@@ -31,7 +31,7 @@ create_boot_directory
 #
 # Create Qt tar archive
 
-create_qt5_fs_tar_archive "textedit" "gui"
+create_qt5_fs_tar_archive "undo" "gui"
 
 #
 # Generate config
@@ -70,8 +70,7 @@ append_if [have_spec linux] config {
 		<provides><service name="File_system"/></provides>
 		<config>
 			<!-- constrain sessions according to their labels -->
-			<policy label="textedit" root="/" writeable="yes" />
-			<policy label="textedit2" root="/" writeable="yes" />
+			<policy label="undo" root="/" writeable="yes" />
 		</config>
 	</start>}
 
@@ -81,31 +80,18 @@ append_if [expr ![have_spec linux]] config {
 		<provides><service name="File_system"/></provides>
 		<config>
 			<!-- constrain sessions according to their labels -->
-			<policy label="textedit" root="/" writeable="yes" />
+			<policy label="undo" root="/" writeable="yes" />
 		</config>
 	</start>}
 
 append config {
-	<start name="textedit">
-		<resource name="RAM" quantum="70M"/>
+	<start name="undo">
+		<resource name="RAM" quantum="128M"/>
 		<config xpos="3" ypos="0" width="500" height="710">
 			<libc stdout="/dev/log" stderr="/dev/log">
 				<vfs>
 					<dir name="dev"> <log/> </dir>
-					<tar name="qt5_fs_textedit.tar"/>
-					<dir name="fs">	<fs/> </dir>
-				</vfs>
-			</libc>
-		</config>
-	</start>
-	<start name="textedit2">
-		<binary name="textedit" />
-		<resource name="RAM" quantum="70M"/>
-		<config xpos="512" ypos="0" width="500" height="710">
-			<libc stdout="/dev/log" stderr="/dev/log">
-				<vfs>
-					<dir name="dev"> <log/> </dir>
-					<tar name="qt5_fs_textedit.tar"/>
+					<tar name="qt5_fs_undo.tar"/>
 					<dir name="fs">	<fs/> </dir>
 				</vfs>
 			</libc>
@@ -120,10 +106,13 @@ install_config $config
 # Boot modules
 #
 
+# The QtQuick plugin currently needs to be provided both in the file system
+# (for Qt) and as ROM module (for 'dlopen()').
+
 append boot_modules [qt5_boot_modules feature]
 
 append boot_modules {
-	textedit
+	undo
 	freetype.lib.so
 	gallium.lib.so
 	icu.lib.so
@@ -140,7 +129,7 @@ append boot_modules {
 	qt5_xml.lib.so
 	zlib.lib.so
 	stdcxx.lib.so
-	qt5_fs_textedit.tar
+	qt5_fs_undo.tar
 }
 
 # platform-specific modules
@@ -165,4 +154,3 @@ append_if $use_ahci_driver qemu_args " -drive id=disk,file=$disk_image,if=none -
 append qemu_args " -m 256"
 
 run_genode_until forever
-
