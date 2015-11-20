@@ -14,7 +14,9 @@ vpath % $(QMAKE_PROJECT_PATH)
 
 include $(QT5_REP_DIR)/src/app/qt5/tmpl/target_defaults.inc
 
-LIBS += qt5_network qt5_widgets qt5_gui qt5_qpa_nitpicker libc libc_resolv libc-resolv lwip libc_lwip libc_lwip_loopback libc_lwip_nic_dhcp config_args pthread
+LIBS += qt5_network qt5_widgets qt5_gui qt5_qpa_nitpicker libc libc_resolv \
+        libc-resolv lwip libc_lwip libc_lwip_loopback libc_lwip_nic_dhcp \
+        config_args pthread libc_lwip_wrapper
 
 CC_CXX_OPT += -DQT_NO_SCRIPTTOOLS
 

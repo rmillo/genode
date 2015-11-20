@@ -1,0 +1,85 @@
+source ${genode_dir}/repos/libports/run/qt5_common.inc
+
+#
+# Build
+#
+
+append build_components [qt5_build_components feature]
+
+append build_components {
+	app/qt5/examples/websockets/echoserver
+}
+
+build $build_components
+
+create_boot_directory
+
+#
+# Generate config
+#
+
+append config {
+<config>
+	<parent-provides>}
+append config [qt5_parent_provides feature]
+append config {
+	</parent-provides>
+	<default-route>
+		<any-service> <parent/> <child name="wm"/> <any-child/> </any-service>
+	</default-route>}
+
+append config [qt5_start_nodes feature]
+
+append config {
+	<start name="echoserver">
+		<resource name="RAM" quantum="128M"/>
+		<config>
+			<arg value="echoserver" />
+		    <arg value="-d" />
+		    <arg value="-p" />
+		    <arg value="9999" />
+			<libc stdout="/dev/log" stderr="/dev/log" ip_addr="10.12.119.169"
+			      netmask="255.255.255.0" gateway="10.12.119.253">
+				<vfs>
+					<dir name="dev"> <log/> </dir>
+				</vfs>
+			</libc>
+		</config>
+	</start>
+</config>}
+
+install_config $config
+
+#
+# Boot modules
+#
+
+# The QtQuick plugin currently needs to be provided both in the file system
+# (for Qt) and as ROM module (for 'dlopen()').
+append boot_modules [qt5_boot_modules feature]
+
+append boot_modules {
+	echoserver
+	gallium.lib.so
+	icu.lib.so
+	ld.lib.so
+	libc.lib.so
+	libc_lock_pipe.lib.so
+	libm.lib.so
+	pthread.lib.so
+	qt5_core.lib.so
+	qt5_network.lib.so
+	qt5_websockets.lib.so
+	zlib.lib.so
+	stdcxx.lib.so
+	libssl.lib.so
+	libcrypto.lib.so
+	lwip.lib.so
+	libc_resolv.lib.so
+}
+
+build_boot_image $boot_modules
+
+append qemu_args " -m 256"
+
+run_genode_until forever
