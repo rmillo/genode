@@ -1,6 +1,7 @@
 source ${genode_dir}/repos/libports/run/qt5_drivers.inc
 
 set feature(Input) 1
+set feature(Nic) 1
 set feature(Framebuffer) 1
 set feature(Timer) 1
 
