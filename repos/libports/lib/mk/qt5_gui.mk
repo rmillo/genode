@@ -7,6 +7,17 @@ CC_WARN = -Wno-unused-but-set-variable -Wno-deprecated-declarations
 
 include $(REP_DIR)/lib/mk/qt5_gui_generated.inc
 
+# remove unneeded files
+QT_SOURCES_FILTER_OUT = \
+  qaccessible.cpp \
+  qaccessiblebridge.cpp \
+  qaccessiblecache.cpp \
+  qaccessibleobject.cpp \
+  qaccessibleplugin.cpp \
+  qplatformaccessibility.cpp \
+  qharfbuzzng.cpp 
+  
+
 # remove unneeded files to prevent moc warnings
 COMPILER_MOC_HEADER_MAKE_ALL_FILES_FILTER_OUT = \
   moc_qsessionmanager.cpp \
@@ -19,7 +30,11 @@ COMPILER_MOC_HEADER_MAKE_ALL_FILES_FILTER_OUT = \
   moc_qpagesetupdialog.cpp \
   moc_qprintdialog.cpp \
   moc_qprintpreviewdialog.cpp \
-  moc_qpagesetupdialog_unix_p.cpp
+  moc_qpagesetupdialog_unix_p.cpp \
+  moc_qaccessible.cpp \
+  moc_qaccessiblecache_p.cpp \
+  moc_qaccessibleplugin.cpp \
+  moc_qaccessiblebridge.cpp \
 
 COMPILER_MOC_SOURCE_MAKE_ALL_FILES_FILTER_OUT = \
   qprintpreviewwidget.moc \
