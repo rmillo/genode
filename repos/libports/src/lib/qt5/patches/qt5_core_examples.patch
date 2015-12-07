@@ -1,0 +1,102 @@
+qt5_core_examples.patch
+
+From: Christian Prochaska <christian.prochaska@genode-labs.com>
+From: Reinier Millo Sánchez <rmillo@uclv.cu>
+
+---
+ qtbase/examples/corelib/json/savegame/main.cpp          | 17 +++++++++++++++++
+ qtbase/examples/corelib/json/savegame/savegame.pro      | 16 +++++-----------
+ .../examples/corelib/threads/semaphores/semaphores.pro  |  5 ++---
+ .../corelib/threads/waitconditions/waitconditions.pro   |  1 -
+ 4 files changed, 24 insertions(+), 15 deletions(-)
+
+diff --git a/qtbase/examples/corelib/json/savegame/main.cpp b/qtbase/examples/corelib/json/savegame/main.cpp
+index 02f0660..c19b72d 100644
+--- a/qtbase/examples/corelib/json/savegame/main.cpp
++++ b/qtbase/examples/corelib/json/savegame/main.cpp
+@@ -39,6 +39,8 @@
+ ****************************************************************************/
+ 
+ #include <QCoreApplication>
++#include <QFile>
++#include <QTextStream>
+ 
+ #include "game.h"
+ //! [0]
+@@ -65,6 +67,21 @@ int main(int argc, char *argv[])
+     if (!fromBinaryGame.loadGame(Game::Binary))
+         return 1;
+ 
++    // Print the json file
++    QFile file("save.json");
++    QTextStream in(&file);
++
++    if(!file.open(QIODevice::ReadOnly)) {
++        printf("error: %s\n", file.errorString().toLocal8Bit().constData());
++    }
++
++    while(!in.atEnd()) {
++        QString line = in.readLine();
++        printf("%s\n",line.toLocal8Bit().constData());
++    }
++
++    file.close();
++
+     return 0;
+ }
+ //! [1]
+diff --git a/qtbase/examples/corelib/json/savegame/savegame.pro b/qtbase/examples/corelib/json/savegame/savegame.pro
+index 6706444..5ab4c8e 100644
+--- a/qtbase/examples/corelib/json/savegame/savegame.pro
++++ b/qtbase/examples/corelib/json/savegame/savegame.pro
+@@ -1,15 +1,5 @@
+-QT += core
+-QT -= gui
+-
+-TARGET = savegame
++QT = core
+ CONFIG += console
+-CONFIG -= app_bundle
+-
+-TEMPLATE = app
+-
+-# install
+-target.path = $$[QT_INSTALL_EXAMPLES]/corelib/json/savegame
+-INSTALLS += target
+ 
+ SOURCES += main.cpp \
+     character.cpp \
+@@ -20,3 +10,7 @@ HEADERS += \
+     character.h \
+     game.h \
+     level.h
++
++# install
++target.path = $$[QT_INSTALL_EXAMPLES]/corelib/json/savegame
++INSTALLS += target
+diff --git a/qtbase/examples/corelib/threads/semaphores/semaphores.pro b/qtbase/examples/corelib/threads/semaphores/semaphores.pro
+index 69154e5..f9423c9 100644
+--- a/qtbase/examples/corelib/threads/semaphores/semaphores.pro
++++ b/qtbase/examples/corelib/threads/semaphores/semaphores.pro
+@@ -1,9 +1,8 @@
+-SOURCES += semaphores.cpp
+ QT = core
+-
+-CONFIG -= app_bundle
+ CONFIG += console
+ 
++SOURCES += semaphores.cpp
++
+ # install
+ target.path = $$[QT_INSTALL_EXAMPLES]/corelib/threads/semaphores
+ INSTALLS += target
+diff --git a/qtbase/examples/corelib/threads/waitconditions/waitconditions.pro b/qtbase/examples/corelib/threads/waitconditions/waitconditions.pro
+index 2dbe7df..35b2d48 100644
+--- a/qtbase/examples/corelib/threads/waitconditions/waitconditions.pro
++++ b/qtbase/examples/corelib/threads/waitconditions/waitconditions.pro
+@@ -1,5 +1,4 @@
+ QT = core
+-CONFIG -= moc app_bundle
+ CONFIG += console
+ 
+ SOURCES += waitconditions.cpp

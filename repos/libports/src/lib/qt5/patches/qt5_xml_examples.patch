@@ -1,0 +1,59 @@
+qt5_xml_examples.patch
+
+From: Christian Prochaska <christian.prochaska@genode-labs.com>
+From: Reinier Millo Sánchez <rmillo@uclv.cu>
+
+---
+ qtbase/examples/xml/dombookmarks/dombookmarks.pro   |  7 -------
+ qtbase/examples/xml/htmlinfo/htmlinfo.pro           | 10 ----------
+ qtbase/examples/xml/xmlstreamlint/xmlstreamlint.pro |  3 ---
+ 3 files changed, 20 deletions(-)
+
+diff --git a/qtbase/examples/xml/dombookmarks/dombookmarks.pro b/qtbase/examples/xml/dombookmarks/dombookmarks.pro
+index 93a5fb9..0700437 100644
+--- a/qtbase/examples/xml/dombookmarks/dombookmarks.pro
++++ b/qtbase/examples/xml/dombookmarks/dombookmarks.pro
+@@ -10,10 +10,3 @@ EXAMPLE_FILES = frank.xbel jennifer.xbel
+ # install
+ target.path = $$[QT_INSTALL_EXAMPLES]/xml/dombookmarks
+ INSTALLS += target
+-
+-wince*: {
+-    addFiles.files = frank.xbel jennifer.xbel
+-    addFiles.path = "\\My Documents"
+-    DEPLOYMENT += addFiles
+-}
+-
+diff --git a/qtbase/examples/xml/htmlinfo/htmlinfo.pro b/qtbase/examples/xml/htmlinfo/htmlinfo.pro
+index 9e58973..00ed8a7 100644
+--- a/qtbase/examples/xml/htmlinfo/htmlinfo.pro
++++ b/qtbase/examples/xml/htmlinfo/htmlinfo.pro
+@@ -1,17 +1,7 @@
+ SOURCES += main.cpp
+-QT -= gui
+-CONFIG -= app_bundle
+ 
+ RESOURCES   = resources.qrc
+ 
+-win32: CONFIG += console
+-
+-wince*:{
+-   htmlfiles.files = *.html
+-   htmlfiles.path = .
+-   DEPLOYMENT += htmlfiles
+-}
+-
+ # install
+ target.path = $$[QT_INSTALL_EXAMPLES]/xml/htmlinfo
+ INSTALLS += target
+diff --git a/qtbase/examples/xml/xmlstreamlint/xmlstreamlint.pro b/qtbase/examples/xml/xmlstreamlint/xmlstreamlint.pro
+index 9752669..ed07114 100644
+--- a/qtbase/examples/xml/xmlstreamlint/xmlstreamlint.pro
++++ b/qtbase/examples/xml/xmlstreamlint/xmlstreamlint.pro
+@@ -1,6 +1,3 @@
+-CONFIG   += console
+-CONFIG   -= app_bundle
+-QT       -= gui
+ QT       += xml
+ SOURCES  += main.cpp
+ 

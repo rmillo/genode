@@ -1,0 +1,6 @@
+qt5_sql_examples.patch
+
+From: Christian Prochaska <christian.prochaska@genode-labs.com>
+From: Reinier Millo Sánchez <rmillo@uclv.cu>
+
+---

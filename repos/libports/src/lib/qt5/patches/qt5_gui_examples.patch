@@ -1,0 +1,74 @@
+qt5_gui_examples.patch
+
+From: Christian Prochaska <christian.prochaska@genode-labs.com>
+From: Humberto López León <humberto@uclv.cu>
+
+From: Reinier Millo Sánchez <rmillo@uclv.cu>
+
+---
+ qtbase/examples/gui/analogclock/analogclock.pro   | 10 +++++++---
+ qtbase/examples/gui/openglwindow/openglwindow.pro | 11 ++++++++---
+ qtbase/examples/gui/rasterwindow/rasterwindow.pro | 10 +++++++---
+ 3 files changed, 22 insertions(+), 9 deletions(-)
+
+diff --git a/qtbase/examples/gui/analogclock/analogclock.pro b/qtbase/examples/gui/analogclock/analogclock.pro
+index eef1727..b1ee121 100644
+--- a/qtbase/examples/gui/analogclock/analogclock.pro
++++ b/qtbase/examples/gui/analogclock/analogclock.pro
+@@ -1,10 +1,14 @@
+-include(../rasterwindow/rasterwindow.pri)
++QT += core
+ 
+ # work-around for QTBUG-13496
+ CONFIG += no_batch
+ 
+ SOURCES += \
+-    main.cpp
++    main.cpp \
++    rasterwindow.cpp
++  
++HEADERS += \
++    rasterwindow.h
+ 
+-target.path = $$[QT_INSTALL_EXAMPLES]/gui/analogclock
++#target.path = $$[QT_INSTALL_EXAMPLES]/gui/analogclock
+ INSTALLS += target
+diff --git a/qtbase/examples/gui/openglwindow/openglwindow.pro b/qtbase/examples/gui/openglwindow/openglwindow.pro
+index 93f18f3..8c9b871 100644
+--- a/qtbase/examples/gui/openglwindow/openglwindow.pro
++++ b/qtbase/examples/gui/openglwindow/openglwindow.pro
+@@ -1,7 +1,12 @@
+-include(openglwindow.pri)
+-
++#include(openglwindow.pri)
++QT += core
++   
+ SOURCES += \
+-    main.cpp
++    main.cpp \
++    openglwindow.cpp
++    
++HEADERS += \
++    openglwindow.h
+ 
+ target.path = $$[QT_INSTALL_EXAMPLES]/gui/openglwindow
+ INSTALLS += target
+diff --git a/qtbase/examples/gui/rasterwindow/rasterwindow.pro b/qtbase/examples/gui/rasterwindow/rasterwindow.pro
+index 8ca4f7a..7a5a9f2 100644
+--- a/qtbase/examples/gui/rasterwindow/rasterwindow.pro
++++ b/qtbase/examples/gui/rasterwindow/rasterwindow.pro
+@@ -1,7 +1,11 @@
+-include(rasterwindow.pri)
++QT += core
+ 
+ SOURCES += \
+-    main.cpp
+-
++    main.cpp \
++    rasterwindow.cpp
++    
++HEADERS += \
++    rasterwindow.h
++    
+ target.path = $$[QT_INSTALL_EXAMPLES]/gui/rasterwindow
+ INSTALLS += target

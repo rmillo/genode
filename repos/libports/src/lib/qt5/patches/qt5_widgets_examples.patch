@@ -1,0 +1,209 @@
+qt5_widgets_examples.patch
+
+From: Christian Prochaska <christian.prochaska@genode-labs.com>
+From: Humberto López León <humberto@uclv.cu>
+
+From: Reinier Millo Sánchez <rmillo@uclv.cu>
+
+---
+ .../examples/widgets/draganddrop/puzzle/puzzle.pro |  6 ------
+ qtbase/examples/widgets/itemviews/chart/chart.pro  |  1 -
+ .../widgets/mainwindows/mainwindow/mainwindow.pro  |  4 ----
+ .../widgets/painting/pathstroke/pathstroke.pro     | 22 +++++++++++-----------
+ qtbase/examples/widgets/painting/shared/shared.pri |  6 ------
+ qtbase/examples/widgets/richtext/textedit/main.cpp | 15 ++++++++++++++-
+ .../widgets/richtext/textedit/textedit.cpp         | 10 +++++-----
+ .../widgets/richtext/textedit/textedit.pro         |  4 ----
+ qtbase/examples/widgets/tools/undo/undo.pro        |  5 -----
+ 9 files changed, 30 insertions(+), 43 deletions(-)
+
+diff --git a/qtbase/examples/widgets/draganddrop/puzzle/puzzle.pro b/qtbase/examples/widgets/draganddrop/puzzle/puzzle.pro
+index 95008fc..97e7206 100644
+--- a/qtbase/examples/widgets/draganddrop/puzzle/puzzle.pro
++++ b/qtbase/examples/widgets/draganddrop/puzzle/puzzle.pro
+@@ -14,9 +14,3 @@ QMAKE_PROJECT_NAME = dndpuzzle
+ # install
+ target.path = $$[QT_INSTALL_EXAMPLES]/widgets/draganddrop/puzzle
+ INSTALLS += target
+-
+-wince*: {
+-   addFile.files = example.jpg
+-   addFile.path = .
+-   DEPLOYMENT += addFile
+-}
+diff --git a/qtbase/examples/widgets/itemviews/chart/chart.pro b/qtbase/examples/widgets/itemviews/chart/chart.pro
+index 4b64b01..3a37575 100644
+--- a/qtbase/examples/widgets/itemviews/chart/chart.pro
++++ b/qtbase/examples/widgets/itemviews/chart/chart.pro
+@@ -6,7 +6,6 @@ RESOURCES   = chart.qrc
+ SOURCES     = main.cpp \
+               mainwindow.cpp \
+               pieview.cpp
+-unix:!mac:!vxworks:!integrity:!haiku:LIBS += -lm
+ 
+ # install
+ target.path = $$[QT_INSTALL_EXAMPLES]/widgets/itemviews/chart
+diff --git a/qtbase/examples/widgets/mainwindows/mainwindow/mainwindow.pro b/qtbase/examples/widgets/mainwindows/mainwindow/mainwindow.pro
+index bf92d0e..61eb770 100644
+--- a/qtbase/examples/widgets/mainwindows/mainwindow/mainwindow.pro
++++ b/qtbase/examples/widgets/mainwindows/mainwindow/mainwindow.pro
+@@ -3,10 +3,6 @@ QT += widgets
+ 
+ HEADERS += colorswatch.h mainwindow.h toolbar.h
+ SOURCES += colorswatch.cpp mainwindow.cpp toolbar.cpp main.cpp
+-build_all:!build_pass {
+-    CONFIG -= build_all
+-    CONFIG += release
+-}
+ 
+ RESOURCES += mainwindow.qrc
+ 
+diff --git a/qtbase/examples/widgets/painting/pathstroke/pathstroke.pro b/qtbase/examples/widgets/painting/pathstroke/pathstroke.pro
+index 8ab3cb9..76d6e0f 100644
+--- a/qtbase/examples/widgets/painting/pathstroke/pathstroke.pro
++++ b/qtbase/examples/widgets/painting/pathstroke/pathstroke.pro
+@@ -1,19 +1,19 @@
++QT += widgets
++
+ SOURCES += main.cpp pathstroke.cpp
+ HEADERS += pathstroke.h
+-
+-SHARED_FOLDER = ../shared
+-
+-include($$SHARED_FOLDER/shared.pri)
+-
+ RESOURCES += pathstroke.qrc
+ 
+-qtHaveModule(opengl) {
+-	DEFINES += QT_OPENGL_SUPPORT
+-	QT += opengl
+-}
+-QT += widgets
++SOURCES += \
++    arthurstyle.cpp\
++    arthurwidgets.cpp \
++    hoverpoints.cpp
++HEADERS += \
++    arthurstyle.h \
++    arthurwidgets.h \
++    hoverpoints.h
++RESOURCES += shared.qrc
+ 
+ # install
+ target.path = $$[QT_INSTALL_EXAMPLES]/widgets/painting/pathstroke
+ INSTALLS += target
+-
+diff --git a/qtbase/examples/widgets/painting/shared/shared.pri b/qtbase/examples/widgets/painting/shared/shared.pri
+index c8d119f..af3223b 100644
+--- a/qtbase/examples/widgets/painting/shared/shared.pri
++++ b/qtbase/examples/widgets/painting/shared/shared.pri
+@@ -1,9 +1,3 @@
+-INCLUDEPATH += $$PWD
+-
+-qtHaveModule(opengl)|contains(QT_CONFIG, opengles2)  {
+-    DEFINES += QT_OPENGL_SUPPORT
+-    QT += opengl widgets
+-}
+ 
+ SOURCES += \
+     $$PWD/arthurstyle.cpp\
+diff --git a/qtbase/examples/widgets/richtext/textedit/main.cpp b/qtbase/examples/widgets/richtext/textedit/main.cpp
+index 4dda7e6..62f5f88 100644
+--- a/qtbase/examples/widgets/richtext/textedit/main.cpp
++++ b/qtbase/examples/widgets/richtext/textedit/main.cpp
+@@ -30,17 +30,30 @@
+ ** $QT_END_LICENSE$
+ **
+ ****************************************************************************/
++/* Genode includes */
++#include <os/config.h>
+ 
++/* Qt includes */
+ #include "textedit.h"
+ #include <QApplication>
+ 
+ int main(int argc, char *argv[])
+ {
+     Q_INIT_RESOURCE(textedit);
++    unsigned int x = 300;
++    unsigned int y = 0;
++    unsigned int w = 700;
++    unsigned int h = 700;
++
++    try { Genode::config()->xml_node().attribute("xpos").value(&x); } catch (...) { }
++    try { Genode::config()->xml_node().attribute("ypos").value(&y); } catch (...) { }
++    try { Genode::config()->xml_node().attribute("width").value(&w); } catch (...) { }
++    try { Genode::config()->xml_node().attribute("height").value(&h); } catch (...) { }
+ 
+     QApplication a(argc, argv);
+     TextEdit mw;
+-    mw.resize(700, 800);
++    mw.move(x, y);
++    mw.resize(w, h);
+     mw.show();
+     return a.exec();
+ }
+diff --git a/qtbase/examples/widgets/richtext/textedit/textedit.cpp b/qtbase/examples/widgets/richtext/textedit/textedit.cpp
+index 6af436b..bb9538a 100644
+--- a/qtbase/examples/widgets/richtext/textedit/textedit.cpp
++++ b/qtbase/examples/widgets/richtext/textedit/textedit.cpp
+@@ -474,7 +474,7 @@ void TextEdit::fileNew()
+ void TextEdit::fileOpen()
+ {
+     QString fn = QFileDialog::getOpenFileName(this, tr("Open File..."),
+-                                              QString(), tr("HTML-Files (*.htm *.html);;All Files (*)"));
++                                              QString("/"), tr("HTML-Files (*.htm *.html);;All Files (*)"));
+     if (!fn.isEmpty())
+         load(fn);
+ }
+@@ -495,15 +495,15 @@ bool TextEdit::fileSave()
+ 
+ bool TextEdit::fileSaveAs()
+ {
+-    QString fn = QFileDialog::getSaveFileName(this, tr("Save as..."), QString(),
+-                                              tr("ODF files (*.odt);;HTML-Files "
++        QString fn = QFileDialog::getSaveFileName(this, tr("Save as..."), QString("/"),
++                                              tr("HTML-Files "
+                                                  "(*.htm *.html);;All Files (*)"));
+     if (fn.isEmpty())
+         return false;
+-    if (!(fn.endsWith(".odt", Qt::CaseInsensitive)
++    if (!(fn.endsWith(".htm", Qt::CaseInsensitive)
+           || fn.endsWith(".htm", Qt::CaseInsensitive)
+           || fn.endsWith(".html", Qt::CaseInsensitive))) {
+-        fn += ".odt"; // default
++        fn += ".html"; // default
+     }
+     setCurrentFileName(fn);
+     return fileSave();
+diff --git a/qtbase/examples/widgets/richtext/textedit/textedit.pro b/qtbase/examples/widgets/richtext/textedit/textedit.pro
+index c32bf68..704f738 100644
+--- a/qtbase/examples/widgets/richtext/textedit/textedit.pro
++++ b/qtbase/examples/widgets/richtext/textedit/textedit.pro
+@@ -9,10 +9,6 @@ SOURCES         = textedit.cpp \
+                   main.cpp
+ 
+ RESOURCES += textedit.qrc
+-build_all:!build_pass {
+-    CONFIG -= build_all
+-    CONFIG += release
+-}
+ 
+ EXAMPLE_FILES = textedit.qdoc
+ 
+diff --git a/qtbase/examples/widgets/tools/undo/undo.pro b/qtbase/examples/widgets/tools/undo/undo.pro
+index 3727c8c..835354b 100644
+--- a/qtbase/examples/widgets/tools/undo/undo.pro
++++ b/qtbase/examples/widgets/tools/undo/undo.pro
+@@ -4,11 +4,6 @@ SOURCES += main.cpp mainwindow.cpp commands.cpp document.cpp
+ HEADERS += mainwindow.h commands.h document.h
+ FORMS += mainwindow.ui
+ 
+-build_all:!build_pass {
+-    CONFIG -= build_all
+-    CONFIG += release
+-}
+-
+ RESOURCES += undo.qrc
+ 
+ # install

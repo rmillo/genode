@@ -1,0 +1,205 @@
+qt5_network_examples.patch
+
+From: Christian Prochaska <christian.prochaska@genode-labs.com>
+From: Alexy Gallardo Segura <alexy@uclv.cu>
+
+From: Reinier Millo Sánchez <rmillo@uclv.cu>
+
+---
+ qtbase/examples/network/fortuneserver/main.cpp         |  7 ++++++-
+ qtbase/examples/network/fortuneserver/server.cpp       | 18 +++++++++++-------
+ qtbase/examples/network/fortuneserver/server.h         |  3 ++-
+ .../examples/network/threadedfortuneserver/dialog.cpp  |  9 +++++----
+ qtbase/examples/network/threadedfortuneserver/dialog.h |  2 +-
+ qtbase/examples/network/threadedfortuneserver/main.cpp |  7 ++++++-
+ 6 files changed, 31 insertions(+), 15 deletions(-)
+
+diff --git a/qtbase/examples/network/fortuneserver/main.cpp b/qtbase/examples/network/fortuneserver/main.cpp
+index 589bb5e..70c0ba6 100644
+--- a/qtbase/examples/network/fortuneserver/main.cpp
++++ b/qtbase/examples/network/fortuneserver/main.cpp
+@@ -45,10 +45,15 @@
+ 
+ #include "server.h"
+ 
++#include <lwip_wrapper.h>
++
+ int main(int argc, char *argv[])
+ {
+     QApplication app(argc, argv);
+-    Server server;
++
++    QString host = get_lwip_ip_addr();
++
++    Server server(host);
+     server.show();
+     qsrand(QTime(0,0,0).secsTo(QTime::currentTime()));
+     return app.exec();
+diff --git a/qtbase/examples/network/fortuneserver/server.cpp b/qtbase/examples/network/fortuneserver/server.cpp
+index 64a7814..25d43d7 100644
+--- a/qtbase/examples/network/fortuneserver/server.cpp
++++ b/qtbase/examples/network/fortuneserver/server.cpp
+@@ -45,13 +45,14 @@
+ 
+ #include "server.h"
+ 
+-Server::Server(QWidget *parent)
++Server::Server(QString host_address, QWidget *parent)
+ :   QDialog(parent), tcpServer(0), networkSession(0)
+ {
++    host_addr = host_address;
+     statusLabel = new QLabel;
+     quitButton = new QPushButton(tr("Quit"));
+     quitButton->setAutoDefault(false);
+-
++    /*
+     QNetworkConfigurationManager manager;
+     if (manager.capabilities() & QNetworkConfigurationManager::NetworkSessionRequired) {
+         // Get saved network configuration
+@@ -72,9 +73,9 @@ Server::Server(QWidget *parent)
+ 
+         statusLabel->setText(tr("Opening network session."));
+         networkSession->open();
+-    } else {
++    } else {*/
+         sessionOpened();
+-    }
++    //}
+ 
+     //! [2]
+         fortunes << tr("You've been leading a dog's life. Stay off the furniture.")
+@@ -107,6 +108,7 @@ Server::Server(QWidget *parent)
+ void Server::sessionOpened()
+ {
+     // Save the used configuration
++    /*
+     if (networkSession) {
+         QNetworkConfiguration config = networkSession->configuration();
+         QString id;
+@@ -120,10 +122,11 @@ void Server::sessionOpened()
+         settings.setValue(QLatin1String("DefaultNetworkConfiguration"), id);
+         settings.endGroup();
+     }
++    */
+ 
+ //! [0] //! [1]
+     tcpServer = new QTcpServer(this);
+-    if (!tcpServer->listen()) {
++    if (!tcpServer->listen(QHostAddress(host_addr), 9999)) {
+         QMessageBox::critical(this, tr("Fortune Server"),
+                               tr("Unable to start the server: %1.")
+                               .arg(tcpServer->errorString()));
+@@ -131,8 +134,8 @@ void Server::sessionOpened()
+         return;
+     }
+ //! [0]
+-    QString ipAddress;
+-    QList<QHostAddress> ipAddressesList = QNetworkInterface::allAddresses();
++    QString ipAddress = host_addr;
++   /* QList<QHostAddress> ipAddressesList = QNetworkInterface::allAddresses();
+     // use the first non-localhost IPv4 address
+     for (int i = 0; i < ipAddressesList.size(); ++i) {
+         if (ipAddressesList.at(i) != QHostAddress::LocalHost &&
+@@ -141,6 +144,7 @@ void Server::sessionOpened()
+             break;
+         }
+     }
++    */
+     // if we did not find one, use IPv4 localhost
+     if (ipAddress.isEmpty())
+         ipAddress = QHostAddress(QHostAddress::LocalHost).toString();
+diff --git a/qtbase/examples/network/fortuneserver/server.h b/qtbase/examples/network/fortuneserver/server.h
+index d21aa10..7118dc3 100644
+--- a/qtbase/examples/network/fortuneserver/server.h
++++ b/qtbase/examples/network/fortuneserver/server.h
+@@ -56,13 +56,14 @@ class Server : public QDialog
+     Q_OBJECT
+ 
+ public:
+-    Server(QWidget *parent = 0);
++    Server(QString host_address, QWidget *parent = 0);
+ 
+ private slots:
+     void sessionOpened();
+     void sendFortune();
+ 
+ private:
++    QString host_addr;
+     QLabel *statusLabel;
+     QPushButton *quitButton;
+     QTcpServer *tcpServer;
+diff --git a/qtbase/examples/network/threadedfortuneserver/dialog.cpp b/qtbase/examples/network/threadedfortuneserver/dialog.cpp
+index c00d879..b5e8ffc 100644
+--- a/qtbase/examples/network/threadedfortuneserver/dialog.cpp
++++ b/qtbase/examples/network/threadedfortuneserver/dialog.cpp
+@@ -46,7 +46,7 @@
+ #include "dialog.h"
+ #include "fortuneserver.h"
+ 
+-Dialog::Dialog(QWidget *parent)
++Dialog::Dialog(QString host_address, QWidget *parent)
+     : QWidget(parent)
+ {
+     statusLabel = new QLabel;
+@@ -54,7 +54,7 @@ Dialog::Dialog(QWidget *parent)
+     quitButton = new QPushButton(tr("Quit"));
+     quitButton->setAutoDefault(false);
+ 
+-    if (!server.listen()) {
++    if (!server.listen(QHostAddress(host_address), 9999)) {
+         QMessageBox::critical(this, tr("Threaded Fortune Server"),
+                               tr("Unable to start the server: %1.")
+                               .arg(server.errorString()));
+@@ -62,8 +62,8 @@ Dialog::Dialog(QWidget *parent)
+         return;
+     }
+ 
+-    QString ipAddress;
+-    QList<QHostAddress> ipAddressesList = QNetworkInterface::allAddresses();
++    QString ipAddress = host_address;
++   /* QList<QHostAddress> ipAddressesList = QNetworkInterface::allAddresses();
+     // use the first non-localhost IPv4 address
+     for (int i = 0; i < ipAddressesList.size(); ++i) {
+         if (ipAddressesList.at(i) != QHostAddress::LocalHost &&
+@@ -75,6 +75,7 @@ Dialog::Dialog(QWidget *parent)
+     // if we did not find one, use IPv4 localhost
+     if (ipAddress.isEmpty())
+         ipAddress = QHostAddress(QHostAddress::LocalHost).toString();
++*/
+     statusLabel->setText(tr("The server is running on\n\nIP: %1\nport: %2\n\n"
+                             "Run the Fortune Client example now.")
+                          .arg(ipAddress).arg(server.serverPort()));
+diff --git a/qtbase/examples/network/threadedfortuneserver/dialog.h b/qtbase/examples/network/threadedfortuneserver/dialog.h
+index 5d3b00a..07edd3f 100644
+--- a/qtbase/examples/network/threadedfortuneserver/dialog.h
++++ b/qtbase/examples/network/threadedfortuneserver/dialog.h
+@@ -54,7 +54,7 @@ class Dialog : public QWidget
+     Q_OBJECT
+ 
+ public:
+-    Dialog(QWidget *parent = 0);
++    Dialog(QString host_address, QWidget *parent = 0);
+ 
+ private:
+     QLabel *statusLabel;
+diff --git a/qtbase/examples/network/threadedfortuneserver/main.cpp b/qtbase/examples/network/threadedfortuneserver/main.cpp
+index e37c2c9..2d52034 100644
+--- a/qtbase/examples/network/threadedfortuneserver/main.cpp
++++ b/qtbase/examples/network/threadedfortuneserver/main.cpp
+@@ -45,10 +45,15 @@
+ 
+ #include "dialog.h"
+ 
++#include <lwip_wrapper.h>
++
+ int main(int argc, char *argv[])
+ {
+     QApplication app(argc, argv);
+-    Dialog dialog;
++
++    QString host = get_lwip_ip_addr();
++
++    Dialog dialog(host);
+     dialog.show();
+     qsrand(QTime(0,0,0).secsTo(QTime::currentTime()));
+     return app.exec();

@@ -1,18 +1,25 @@
 qt5_tools.patch
 
 From: Christian Prochaska <christian.prochaska@genode-labs.com>
+From: Reinier Millo Sánchez <rmillo@uclv.cu>
 
 Support out-of-tree build of Qt host tools.
 This patch should not be applied when running the Qt 'configure' script.
 ---
- qtbase/mkspecs/features/qt_build_config.prf |    2 +
- qtbase/mkspecs/features/qt_functions.prf    |    2 +
- qtbase/mkspecs/features/qt_module.prf       |    4 +-
- qtbase/mkspecs/features/qt_tool.prf         |   54 ++++++++++++++-------------
- 4 files changed, 31 insertions(+), 31 deletions(-)
+ qtbase/mkspecs/features/qt_build_config.prf        |   2 +-
+ qtbase/mkspecs/features/qt_functions.prf           |   2 +-
+ qtbase/mkspecs/features/qt_module.prf              |   4 +-
+ qtbase/mkspecs/features/qt_tool.prf                |  94 ++++++++---------
+ qtbase/mkspecs/genode-g++/qmake.conf               |  12 +++
+ qtbase/mkspecs/genode-g++/qplatformdefs.h          | 112 +++++++++++++++++++++
+ qtbase/qmake/Makefile.unix                         |   2 +-
+ qtwebkit/Tools/qmake/mkspecs/features/features.prf |   6 +-
+ 8 files changed, 179 insertions(+), 55 deletions(-)
+ create mode 100644 qtbase/mkspecs/genode-g++/qmake.conf
+ create mode 100644 qtbase/mkspecs/genode-g++/qplatformdefs.h
 
 diff --git a/qtbase/mkspecs/features/qt_build_config.prf b/qtbase/mkspecs/features/qt_build_config.prf
-index a29e09c..32c8388 100644
+index 7197f84..3425680 100644
 --- a/qtbase/mkspecs/features/qt_build_config.prf
 +++ b/qtbase/mkspecs/features/qt_build_config.prf
 @@ -12,7 +12,7 @@
@@ -20,25 +27,25 @@ index a29e09c..32c8388 100644
      QMAKE_QT_MODULE = $$[QT_HOST_DATA/get]/mkspecs/qmodule.pri
      !exists($$QMAKE_QT_MODULE)|!include($$QMAKE_QT_MODULE, "", true) {
 -        error("Cannot load qmodule.pri!")
-+        debug(1, "Cannot load qmodule.pri!")
++        debug(1,"Cannot load qmodule.pri!")
      } else {
          debug(1, "Loaded qmodule.pri from ($$QMAKE_QT_MODULE)")
      }
 diff --git a/qtbase/mkspecs/features/qt_functions.prf b/qtbase/mkspecs/features/qt_functions.prf
-index bbbb5d3..62006ee 100644
+index a1c4996..ca2a05c 100644
 --- a/qtbase/mkspecs/features/qt_functions.prf
 +++ b/qtbase/mkspecs/features/qt_functions.prf
-@@ -167,7 +167,7 @@ defineTest(qtAddModules) {
+@@ -174,7 +174,7 @@ defineTest(qtAddModules) {
  
-         qtAddModule($$QTLIB, $$eval(QT.$${QTLIB}.want_private), $$2)
+         qtAddModule($$QTLIB, $$2)
      }
--    !isEmpty(BAD_QT):error("Unknown module(s) in $$1: $$BAD_QT")
-+    !isEmpty(BAD_QT):debug(1, "Unknown module(s) in $$1: $$BAD_QT")
- 
-     export(using_privates)
+-    !isEmpty(BAD_QT):error("Unknown module(s) in $$1: $$replace(BAD_QT, _private$, -private)")
++    !isEmpty(BAD_QT):debug(1,"Unknown module(s) in $$1: $$replace(BAD_QT, _private$, -private)")
  }
+ 
+ defineTest(qtAddRpathLink) {
 diff --git a/qtbase/mkspecs/features/qt_module.prf b/qtbase/mkspecs/features/qt_module.prf
-index 53a5499..035480d 100644
+index 5412f37..0828835 100644
 --- a/qtbase/mkspecs/features/qt_module.prf
 +++ b/qtbase/mkspecs/features/qt_module.prf
 @@ -21,7 +21,7 @@ load(qt_build_config) # loads qmodule.pri if hasn't been loaded already
@@ -46,31 +53,31 @@ index 53a5499..035480d 100644
  isEmpty(MODULE):MODULE = $$section($$list($$basename(_PRO_FILE_)), ., 0, 0)
  isEmpty(VERSION): VERSION = $$MODULE_VERSION
 -isEmpty(VERSION): error("Module does not define version.")
-+isEmpty(VERSION): debug(1, "Module does not define version.")
++isEmpty(VERSION): debug(1,"Module does not define version.")
  
  # Compile as shared/DLL or static according to the option given to configure
  # unless overridden. Host builds are always static
-@@ -53,7 +53,7 @@ else: \
-     MODULE_DEFINE = QT_$${ucmodule}_LIB
- MODULE_DEFINES = $$MODULE_DEFINE $$MODULE_DEFINES
+@@ -73,7 +73,7 @@ CONFIG          += qmake_cache target_qt
+ 
+ QMAKE_DOCS_TARGETDIR = qt$${MODULE}
  
 -load(qt_module_pris)
 +#load(qt_module_pris)
+ load(qt_common)
  
- INCLUDEPATH *= $$eval(QT.$${MODULE}.includes) $$eval(QT.$${MODULE}.private_includes)
- 
+ !no_module_headers: load(qt_module_headers)
 diff --git a/qtbase/mkspecs/features/qt_tool.prf b/qtbase/mkspecs/features/qt_tool.prf
-index 9a6b963..30a2059 100644
+index 1d3e88c..45e6a14 100644
 --- a/qtbase/mkspecs/features/qt_tool.prf
 +++ b/qtbase/mkspecs/features/qt_tool.prf
-@@ -16,30 +16,30 @@ CONFIG += console
+@@ -16,50 +16,50 @@ CONFIG += console
  # If we are doing a prefix build, create a "module" pri which enables
  # qtPrepareTool() to work with the non-installed build.
  # Non-bootstrapped tools always need this because of the environment setup.
 -!build_pass:if(!host_build|!force_bootstrap|force_independent) {
 -    isEmpty(MODULE):MODULE = $$TARGET
 -
--    !host_build|!force_bootstrap: MODULE_DEPENDS = $$replace(QT, -private$, )
+-    !host_build|!force_bootstrap: MODULE_DEPENDS = $$replace(QT, -private$, _private)
 -
 -    load(qt_build_paths)
 -
@@ -78,9 +85,29 @@ index 9a6b963..30a2059 100644
 -
 -    TOOL_PRI = $$MODULE_QMAKE_OUTDIR/mkspecs/modules/qt_tool_$${MODULE}.pri
 -
+-    vars = binary depends
+-    !isEmpty(QT_TOOL_ENV) {
+-        vars += envvars
+-        module_var_names =
+-        module_var_sets =
+-        for(var, QT_TOOL_ENV) {
+-            vars += env.$${var}.name env.$${var}.value
+-            module_var_names += QT_TOOL.$${MODULE}.env.$${var}
+-            module_var_sets += \
+-                "QT_TOOL.$${MODULE}.env.$${var}.name = $$val_escape($${var}.name)" \
+-                "QT_TOOL.$${MODULE}.env.$${var}.value = $$val_escape($${var}.value)"
+-        }
+-        module_envvars = \
+-            "QT_TOOL.$${MODULE}.envvars = $$module_var_names" \
+-            $$module_var_sets
+-    } else {
+-        module_envvars =
+-    }
+-    bin = $$system_path($$QMAKE_RESOLVED_TARGET)
 -    TOOL_PRI_CONT = \
--        "QT_TOOL.$${MODULE}.binary = $$QMAKE_RESOLVED_TARGET" \
--        "QT_TOOL.$${MODULE}.depends =$$join(MODULE_DEPENDS, " ", " ")"
+-        "QT_TOOL.$${MODULE}.binary = $$val_escape(bin)" \
+-        "QT_TOOL.$${MODULE}.depends =$$join(MODULE_DEPENDS, " ", " ")" \
+-        $$module_envvars
 -    write_file($$TOOL_PRI, TOOL_PRI_CONT)|error("Aborting.")
 -
 -    # Then, inject the new tool into the current cache state
@@ -90,14 +117,14 @@ index 9a6b963..30a2059 100644
 -        unset(added)
 -    }
 -    include($$TOOL_PRI)
--    for(var, $$list(binary depends)): \
+-    for(var, vars): \
 -        cache(QT_TOOL.$${MODULE}.$$var, transient)
 -
 -}
 +#!build_pass:if(!host_build|!force_bootstrap|force_independent) {
 +#    isEmpty(MODULE):MODULE = $$TARGET
 +#
-+#    !host_build|!force_bootstrap: MODULE_DEPENDS = $$replace(QT, -private$, )
++#    !host_build|!force_bootstrap: MODULE_DEPENDS = $$replace(QT, -private$, _private)
 +#
 +#    load(qt_build_paths)
 +#
@@ -105,9 +132,29 @@ index 9a6b963..30a2059 100644
 +#
 +#    TOOL_PRI = $$MODULE_QMAKE_OUTDIR/mkspecs/modules/qt_tool_$${MODULE}.pri
 +#
++#    vars = binary depends
++#    !isEmpty(QT_TOOL_ENV) {
++#        vars += envvars
++#        module_var_names =
++#        module_var_sets =
++#        for(var, QT_TOOL_ENV) {
++#            vars += env.$${var}.name env.$${var}.value
++#            module_var_names += QT_TOOL.$${MODULE}.env.$${var}
++#            module_var_sets += \
++#                "QT_TOOL.$${MODULE}.env.$${var}.name = $$val_escape($${var}.name)" \
++#                "QT_TOOL.$${MODULE}.env.$${var}.value = $$val_escape($${var}.value)"
++#        }
++#        module_envvars = \
++#            "QT_TOOL.$${MODULE}.envvars = $$module_var_names" \
++#            $$module_var_sets
++#    } else {
++#        module_envvars =
++#    }
++#    bin = $$system_path($$QMAKE_RESOLVED_TARGET)
 +#    TOOL_PRI_CONT = \
-+#        "QT_TOOL.$${MODULE}.binary = $$QMAKE_RESOLVED_TARGET" \
-+#        "QT_TOOL.$${MODULE}.depends =$$join(MODULE_DEPENDS, " ", " ")"
++#        "QT_TOOL.$${MODULE}.binary = $$val_escape(bin)" \
++#        "QT_TOOL.$${MODULE}.depends =$$join(MODULE_DEPENDS, " ", " ")" \
++#        $$module_envvars
 +#    write_file($$TOOL_PRI, TOOL_PRI_CONT)|error("Aborting.")
 +#
 +#    # Then, inject the new tool into the current cache state
@@ -117,7 +164,182 @@ index 9a6b963..30a2059 100644
 +#        unset(added)
 +#    }
 +#    include($$TOOL_PRI)
-+#    for(var, $$list(binary depends)): \
++#    for(var, vars): \
 +#        cache(QT_TOOL.$${MODULE}.$$var, transient)
 +#
 +#}
+diff --git a/qtbase/mkspecs/genode-g++/qmake.conf b/qtbase/mkspecs/genode-g++/qmake.conf
+new file mode 100644
+index 0000000..8839c69
+--- /dev/null
++++ b/qtbase/mkspecs/genode-g++/qmake.conf
+@@ -0,0 +1,12 @@
++#
++# qmake configuration for genode-g++
++#
++
++MAKEFILE_GENERATOR	= UNIX
++CONFIG += incremental
++QMAKE_INCREMENTAL_STYLE = sublib
++
++include(../common/linux.conf)
++include(../common/gcc-base-unix.conf)
++include(../common/g++-unix.conf)
++load(qt_config)
+\ No newline at end of file
+diff --git a/qtbase/mkspecs/genode-g++/qplatformdefs.h b/qtbase/mkspecs/genode-g++/qplatformdefs.h
+new file mode 100644
+index 0000000..4927540
+--- /dev/null
++++ b/qtbase/mkspecs/genode-g++/qplatformdefs.h
+@@ -0,0 +1,112 @@
++/****************************************************************************
++**
++** Copyright (C) 2013 Digia Plc and/or its subsidiary(-ies).
++** Contact: http://www.qt-project.org/legal
++**
++** This file is part of the qmake spec of the Qt Toolkit.
++**
++** $QT_BEGIN_LICENSE:LGPL$
++** Commercial License Usage
++** Licensees holding valid commercial Qt licenses may use this file in
++** accordance with the commercial license agreement provided with the
++** Software or, alternatively, in accordance with the terms contained in
++** a written agreement between you and Digia.  For licensing terms and
++** conditions see http://qt.digia.com/licensing.  For further information
++** use the contact form at http://qt.digia.com/contact-us.
++**
++** GNU Lesser General Public License Usage
++** Alternatively, this file may be used under the terms of the GNU Lesser
++** General Public License version 2.1 as published by the Free Software
++** Foundation and appearing in the file LICENSE.LGPL included in the
++** packaging of this file.  Please review the following information to
++** ensure the GNU Lesser General Public License version 2.1 requirements
++** will be met: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
++**
++** In addition, as a special exception, Digia gives you certain additional
++** rights.  These rights are described in the Digia Qt LGPL Exception
++** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
++**
++** GNU General Public License Usage
++** Alternatively, this file may be used under the terms of the GNU
++** General Public License version 3.0 as published by the Free Software
++** Foundation and appearing in the file LICENSE.GPL included in the
++** packaging of this file.  Please review the following information to
++** ensure the GNU General Public License version 3.0 requirements will be
++** met: http://www.gnu.org/copyleft/gpl.html.
++**
++**
++** $QT_END_LICENSE$
++**
++****************************************************************************/
++
++#ifndef QPLATFORMDEFS_H
++#define QPLATFORMDEFS_H
++
++// Get Qt defines/settings
++
++#include "qglobal.h"
++
++// Set any POSIX/XOPEN defines at the top of this file to turn on specific APIs
++
++// 1) need to reset default environment if _BSD_SOURCE is defined
++// 2) need to specify POSIX thread interfaces explicitly in glibc 2.0
++// 3) it seems older glibc need this to include the X/Open stuff
++#ifndef _GNU_SOURCE
++#  define _GNU_SOURCE
++#endif
++
++#include <unistd.h>
++
++
++// We are hot - unistd.h should have turned on the specific APIs we requested
++
++#ifndef Q_OS_GENODE
++#include <features.h>
++#endif
++#include <pthread.h>
++#include <dirent.h>
++#include <fcntl.h>
++#include <grp.h>
++#include <pwd.h>
++#include <signal.h>
++
++#include <sys/types.h>
++#include <sys/ioctl.h>
++#include <sys/ipc.h>
++#include <sys/time.h>
++#ifndef Q_OS_GENODE
++#include <sys/shm.h>
++#endif
++#include <sys/socket.h>
++#include <sys/stat.h>
++#include <sys/wait.h>
++#include <netinet/in.h>
++#ifdef Q_OS_GENODE
++#define QT_NO_IPV6IFNAME
++#endif
++#ifndef QT_NO_IPV6IFNAME
++#include <net/if.h>
++#endif
++
++#define QT_USE_XOPEN_LFS_EXTENSIONS
++#include "../common/posix/qplatformdefs.h"
++
++#ifdef Q_OS_GENODE
++#undef QT_OPEN_LARGEFILE
++#define QT_OPEN_LARGEFILE 0
++#endif
++
++#undef QT_SOCKLEN_T
++
++#if (defined(__GLIBC__) && (__GLIBC__ >= 2)) || defined(Q_OS_GENODE)
++#define QT_SOCKLEN_T            socklen_t
++#else
++#define QT_SOCKLEN_T            int
++#endif
++
++#if defined(_XOPEN_SOURCE) && (_XOPEN_SOURCE >= 500)
++#define QT_SNPRINTF		::snprintf
++#define QT_VSNPRINTF		::vsnprintf
++#endif
++
++#endif // QPLATFORMDEFS_H
+\ No newline at end of file
+diff --git a/qtbase/qmake/Makefile.unix b/qtbase/qmake/Makefile.unix
+index 86f884f..004247e 100644
+--- a/qtbase/qmake/Makefile.unix
++++ b/qtbase/qmake/Makefile.unix
+@@ -227,7 +227,7 @@ qsettings.o: $(SOURCE_PATH)/src/corelib/io/qsettings.cpp
+ qsystemerror.o: $(SOURCE_PATH)/src/corelib/kernel/qsystemerror.cpp
+ 	$(CXX) -c -o $@ $(CXXFLAGS) $(SOURCE_PATH)/src/corelib/kernel/qsystemerror.cpp
+ 
+-qlibraryinfo.o: $(SOURCE_PATH)/src/corelib/global/qlibraryinfo.cpp $(BUILD_PATH)/src/corelib/global/qconfig.cpp
++qlibraryinfo.o: $(SOURCE_PATH)/src/corelib/global/qlibraryinfo.cpp
+ 	$(CXX) -c -o $@ $(CXXFLAGS) $(SOURCE_PATH)/src/corelib/global/qlibraryinfo.cpp
+ 
+ qnumeric.o: $(SOURCE_PATH)/src/corelib/global/qnumeric.cpp
+diff --git a/qtwebkit/Tools/qmake/mkspecs/features/features.prf b/qtwebkit/Tools/qmake/mkspecs/features/features.prf
+index 7b0b49d..9a03e09 100644
+--- a/qtwebkit/Tools/qmake/mkspecs/features/features.prf
++++ b/qtwebkit/Tools/qmake/mkspecs/features/features.prf
+@@ -42,8 +42,8 @@ defineTest(detectFeatures) {
+ 
+     config_libxml2: WEBKIT_CONFIG += use_libxml2
+     config_libxslt: WEBKIT_CONFIG += xslt
+-    config_libzlib: WEBKIT_CONFIG += use_zlib
+-    config_libwebp: WEBKIT_CONFIG += use_webp
++    #config_libzlib: WEBKIT_CONFIG += use_zlib
++    #config_libwebp: WEBKIT_CONFIG += use_webp
+     config_leveldb: WEBKIT_CONFIG += use_system_leveldb
+ 
+     # We can't use Qt's 3rdparty sources for libjpeg and libpng outside of qtbase, but if Qt
+@@ -85,7 +85,7 @@ defineTest(detectFeatures) {
+ 
+     # Enable the USE(3D_GRAPHICS) flag when QtOpenGL is enabled.
+     # Disable on Windows CE for now, as ANGLE won't compile.
+-    !wince*:contains(QT_CONFIG, opengl): WEBKIT_CONFIG += use_3d_graphics
++    #!wince*:contains(QT_CONFIG, opengl): WEBKIT_CONFIG += use_3d_graphics
+ 
+     # Temporarily disable FTPDIR on Windows CE (missing functions from time.h)
+     wince* {
