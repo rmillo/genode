@@ -337,6 +337,13 @@ int Plugin::fcntl(Libc::File_descriptor *sockfdo, int cmd, long val)
 		 */
 		result = lwip_fcntl(s, cmd, (val & O_NONBLOCK) ? lwip_O_NONBLOCK : 0);
 		break;
+	case F_SETFD:
+		/*
+		 * set file descriptor flags
+		 * Review the implementation on lwip. TODO
+		 */
+		result = 0;
+		break;
 	default:
 		PERR("libc_lwip: unsupported fcntl() request: %d", cmd);
 		break;
