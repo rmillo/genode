@@ -7,11 +7,13 @@ include $(QT5_REP_DIR)/lib/mk/qt5_version.inc
 QT5_PORT_DIR := $(call select_from_ports,qt5)
 QT5_CONTRIB_DIR := $(QT5_PORT_DIR)/src/lib/qt5/$(QT5)
 
-QMAKE_PROJECT_PATH = $(QT5_CONTRIB_DIR)/qtbase/examples/gui/openglwindow
-QMAKE_PROJECT_FILE = $(QMAKE_PROJECT_PATH)/openglwindow.pro
+QMAKE_PROJECT_PATH = $(QT5_CONTRIB_DIR)/qtbase/examples/gui/rasterwindow
+QMAKE_PROJECT_FILE = $(QMAKE_PROJECT_PATH)/rasterwindow.pro
 
 vpath % $(QMAKE_PROJECT_PATH)
 
 include $(QT5_REP_DIR)/src/app/qt5/tmpl/target_defaults.inc
 
 include $(QT5_REP_DIR)/src/app/qt5/tmpl/target_final.inc
+
+LIBS += qt5_gui qt5_qpa_nitpicker qt5_widgets 

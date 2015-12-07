@@ -7,7 +7,7 @@ source ${genode_dir}/repos/libports/run/qt5_common.inc
 append build_components [qt5_build_components feature]
 
 append build_components {
-	app/qt5/examples/openglwindow
+	app/qt5/examples/gui/analogclock
 }
 
 build $build_components
@@ -18,7 +18,7 @@ create_boot_directory
 # Create Qt tar archive
 #
 
-create_qt5_fs_tar_archive "openglwindow" "gui"
+create_qt5_fs_tar_archive "analogclock" "gui"
 
 #
 # Generate config
@@ -37,13 +37,13 @@ append config {
 append config [qt5_start_nodes feature]
 
 append config {
-	<start name="openglwindow">
-		<resource name="RAM" quantum="80M"/>
+	<start name="analogclock">
+		<resource name="RAM" quantum="128M"/>
 		<config>
 			<libc stdout="/dev/log" stderr="/dev/log">
 				<vfs>
 					<dir name="dev"> <log/> </dir>
-					<tar name="qt5_fs_openglwindow.tar"/>
+					<tar name="qt5_fs_analogclock.tar"/>
 				</vfs>
 			</libc>
 		</config>
@@ -57,10 +57,13 @@ install_config $config
 # Boot modules
 #
 
+# The QtQuick plugin currently needs to be provided both in the file system
+# (for Qt) and as ROM module (for 'dlopen()').
+
 append boot_modules [qt5_boot_modules feature]
 
 append boot_modules {
-	openglwindow
+	analogclock
 	freetype.lib.so
 	gallium.lib.so
 	icu.lib.so
@@ -77,7 +80,7 @@ append boot_modules {
 	qt5_xml.lib.so
 	zlib.lib.so
 	stdcxx.lib.so
-	qt5_fs_openglwindow.tar
+	qt5_fs_analogclock.tar
 }
 
 build_boot_image $boot_modules
@@ -85,4 +88,3 @@ build_boot_image $boot_modules
 append qemu_args " -m 256"
 
 run_genode_until forever
-
