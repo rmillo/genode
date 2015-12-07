@@ -24,7 +24,8 @@ SRC_CC += main.cpp \
           moc_qevdevkeyboardhandler_p.cpp \
           moc_qsignalhandlerthread.cpp
 
-INC_DIR += $(QT5_CONTRIB_DIR)/qtbase/src/platformsupport/eventdispatchers \
+INC_DIR += $(QT5_CONTRIB_DIR)/qtbase/mkspecs/genode-g++ \
+           $(QT5_CONTRIB_DIR)/qtbase/src/platformsupport/eventdispatchers \
            $(QT5_CONTRIB_DIR)/qtbase/src/platformsupport/fontdatabases/basic \
            $(QT5_CONTRIB_DIR)/qtbase/src/3rdparty/harfbuzz/src \
            $(QT5_CONTRIB_DIR)/qtbase/include/QtPlatformSupport/$(QT_VERSION) \

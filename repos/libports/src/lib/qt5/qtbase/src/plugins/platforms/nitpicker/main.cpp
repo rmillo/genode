@@ -15,18 +15,12 @@
 
 QT_BEGIN_NAMESPACE
 
-QStringList QNitpickerIntegrationPlugin::keys() const
-{
-    QStringList list;
-    list << "Nitpicker";
-    return list;
-}
-
 QPlatformIntegration *QNitpickerIntegrationPlugin::create(const QString& system, const QStringList& paramList)
 {
     Q_UNUSED(paramList);
-    if (system.toLower() == "nitpicker")
+    if (!system.compare(QLatin1String("nitpicker"), Qt::CaseInsensitive)){
         return new QNitpickerIntegration;
+    }
 
     return 0;
 }

@@ -37,11 +37,14 @@ QNitpickerIntegration::QNitpickerIntegration()
   _nitpicker_screen(new QNitpickerScreen()),
   _event_dispatcher(createUnixEventDispatcher())
 {
-    QGuiApplicationPrivate::instance()->setEventDispatcher(_event_dispatcher);
     screenAdded(_nitpicker_screen);
     _signal_handler_thread.start();
 }
 
+QNitpickerIntegration::~QNitpickerIntegration()
+{
+    delete _nitpicker_screen;
+}
 
 bool QNitpickerIntegration::hasCapability(QPlatformIntegration::Capability cap) const
 {
@@ -58,10 +61,12 @@ QPlatformWindow *QNitpickerIntegration::createPlatformWindow(QWindow *window) co
 		qDebug() << "QNitpickerIntegration::createPlatformWindow(" << window << ")";
 
     QRect screen_geometry = _nitpicker_screen->geometry();
-    return new QNitpickerPlatformWindow(window,
-                                        _signal_receiver(),
-                                        screen_geometry.width(),
-                                        screen_geometry.height());
+    QPlatformWindow *w = new QNitpickerPlatformWindow(window,
+                                         _signal_receiver(),
+                                         screen_geometry.width(),
+                                         screen_geometry.height());
+    w->requestActivateWindow();
+    return w;
 }
 
 
@@ -73,7 +78,7 @@ QPlatformBackingStore *QNitpickerIntegration::createPlatformBackingStore(QWindow
 }
 
 
-QAbstractEventDispatcher *QNitpickerIntegration::guiThreadEventDispatcher() const
+QAbstractEventDispatcher *QNitpickerIntegration::createEventDispatcher() const
 {
 	if (verbose)
 		qDebug() << "QNitpickerIntegration::guiThreadEventDispatcher()";
@@ -100,6 +105,14 @@ QPlatformClipboard *QNitpickerIntegration::clipboard() const
 QPlatformOpenGLContext *QNitpickerIntegration::createPlatformOpenGLContext(QOpenGLContext *context) const
 {
     return new QNitpickerGLContext(context);
+}
+
+QVariant QNitpickerIntegration::styleHint(QPlatformIntegration::StyleHint hint) const
+{
+    if (hint == QPlatformIntegration::ShowIsFullScreen)
+        return true;
+
+    return QPlatformIntegration::styleHint(hint);
 }
 
 QT_END_NAMESPACE
