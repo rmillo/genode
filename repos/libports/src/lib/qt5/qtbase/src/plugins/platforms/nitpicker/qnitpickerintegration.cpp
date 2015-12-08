@@ -93,15 +93,6 @@ QPlatformFontDatabase *QNitpickerIntegration::fontDatabase() const
 }
 
 
-#ifndef QT_NO_CLIPBOARD
-QPlatformClipboard *QNitpickerIntegration::clipboard() const
-{
-	static QGenodeClipboard cb(_signal_receiver());
-	return &cb;
-}
-#endif
-
-
 QPlatformOpenGLContext *QNitpickerIntegration::createPlatformOpenGLContext(QOpenGLContext *context) const
 {
     return new QNitpickerGLContext(context);
