@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (C) 2014 Genode Labs GmbH
+ * Copyright (C) 2014-2016 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
@@ -252,6 +252,19 @@ bool queue_work(struct workqueue_struct *wq, struct work_struct *work)
 	_lx_work->schedule(work);
 	_lx_work->unblock();
 
+	return true;
+}
+
+
+bool mod_delayed_work(struct workqueue_struct *wq, struct delayed_work *dwork,
+                      unsigned long delay)
+{
+	/* treat delayed work without delay like any other work */
+	if (delay == 0) {
+		execute_delayed_work((unsigned long)dwork);
+	} else {
+		mod_timer(&dwork->timer, delay);
+	}
 	return true;
 }
 

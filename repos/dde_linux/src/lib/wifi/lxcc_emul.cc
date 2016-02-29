@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (C) 2014 Genode Labs GmbH
+ * Copyright (C) 2014-2016 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
@@ -674,6 +674,80 @@ int memcpy_toiovec(struct iovec *iov, unsigned char *kdata, int len)
 }
 
 
+size_t copy_from_iter(void *addr, size_t bytes, struct iov_iter *i)
+{
+	if (bytes > i->count)
+		bytes = i->count;
+
+	if (bytes == 0)
+		return 0;
+
+	char             *kdata = reinterpret_cast<char*>(addr);
+	struct iovec const *iov = i->iov;
+
+	size_t len = bytes;
+	while (len > 0) {
+		if (iov->iov_len) {
+			size_t copy_len = (size_t)len < iov->iov_len ? len : iov->iov_len;
+			Genode::memcpy(kdata, iov->iov_base, copy_len);
+
+			len -= copy_len;
+			kdata += copy_len;
+		}
+		iov++;
+	}
+
+	// PDBG("addr: %p bytes: %zu iov_base: %p iov_len: %zu len: %zu",
+	//      addr, bytes, i->iov->iov_base, i->iov->iov_len, len);
+
+	return bytes;
+}
+
+
+size_t copy_to_iter(void *addr, size_t bytes, struct iov_iter *i)
+{
+	if (bytes > i->count)
+		bytes = i->count;
+
+	if (bytes == 0)
+		return 0;
+
+	char             *kdata = reinterpret_cast<char*>(addr);
+	struct iovec const *iov = i->iov;
+
+	size_t len = bytes;
+	while (len > 0) {
+		if (iov->iov_len) {
+			size_t copy_len = (size_t)len < iov->iov_len ? len : iov->iov_len;
+			Genode::memcpy(iov->iov_base, kdata, copy_len);
+
+			len -= copy_len;
+			kdata += copy_len;
+		}
+		iov++;
+	}
+
+	// PDBG("addr: %p bytes: %zu iov_base: %p iov_len: %zu len: %zu",
+	//      addr, bytes, i->iov->iov_base, i->iov->iov_len, len);
+
+	return bytes;
+}
+
+
+size_t copy_page_to_iter(struct page *page, size_t offset, size_t bytes,
+                         struct iov_iter *i)
+{
+	return copy_to_iter(page->addr + offset, bytes, i);
+}
+
+
+size_t copy_page_from_iter(struct page *page, size_t offset, size_t bytes,
+                           struct iov_iter *i)
+{
+	return copy_from_iter(page->addr + offset, bytes, i);
+}
+
+
 /********************
  ** linux/socket.h **
  ********************/
@@ -726,6 +800,13 @@ void *kmalloc(size_t size, gfp_t flags)
 }
 
 
+void *kmalloc_array(size_t n, size_t size, gfp_t flags)
+{
+	if (size != 0 && n > SIZE_MAX / size) return NULL;
+	return kmalloc(n * size, flags);
+}
+
+
 void *kzalloc(size_t size, gfp_t flags)
 {
 	return kmalloc(size, flags | __GFP_ZERO);
@@ -758,6 +839,12 @@ void kfree(void const *p)
 	else
 		PERR("%s: unknown block at %p, called from %p", __func__,
 		     p, __builtin_return_address(0));
+}
+
+
+void kvfree(const void *p)
+{
+	kfree(p);
 }
 
 
@@ -1135,6 +1222,16 @@ unsigned long round_jiffies_relative(unsigned long j)
 }
 
 
+/*************************
+ ** linux/timekeeping.h **
+ *************************/
+
+time64_t ktime_get_seconds(void)
+{
+	return jiffies_to_msecs(jiffies) / 1000;
+}
+
+
 /***********************
  ** linux/workqueue.h **
  ***********************/
@@ -1148,6 +1245,12 @@ struct workqueue_struct *create_singlethread_workqueue(char const *)
 struct workqueue_struct *alloc_ordered_workqueue(char const *name , unsigned int flags, ...)
 {
 	return create_singlethread_workqueue(name);
+}
+
+struct workqueue_struct *alloc_workqueue(const char *fmt, unsigned int flags,
+                                         int max_active, ...)
+{
+	return create_singlethread_workqueue(nullptr);
 }
 
 
@@ -1167,33 +1270,37 @@ int request_firmware_nowait(struct module *module, bool uevent,
 	/* only try to load known firmware images */
 	Firmware_list *fwl = 0;
 	for (size_t i = 0; i < fw_list_len; i++) {
-		if (Genode::strcmp(name, fw_list[i].name) == 0) {
+		if (Genode::strcmp(name, fw_list[i].requested_name) == 0) {
 			fwl = &fw_list[i];
 			break;
 		}
 	}
 
 	if (!fwl) {
-		PERR("firmware '%s' is not in the firmware white list.", name);
+		PERR("Firmware '%s' is not in the firmware white list.", name);
 		return -1;
 	}
 
-	Genode::Rom_connection rom(fwl->name);
+	char const *fw_name = fwl->available_name
+	                    ? fwl->available_name : fwl->requested_name;
+	Genode::Rom_connection rom(fw_name);
 	Genode::Dataspace_capability ds_cap = rom.dataspace();
 
-	if (!ds_cap.valid())
+	if (!ds_cap.valid()) {
+		PERR("Could not get firmware ROM dataspace");
 		return -1;
+	}
 
 	firmware *fw = (firmware *)kzalloc(sizeof (firmware), 0);
 	if (!fw) {
-		PERR("could not allocate memory for struct firmware");
+		PERR("Could not allocate memory for firmware metadata");
 		return -1;
 	}
 
 	/* use Genode env because our slab only goes up to 64KiB */
 	fw->data = (u8*)Genode::env()->heap()->alloc(fwl->size);
 	if (!fw->data) {
-		PERR("could not allocate memory for firmware image");
+		PERR("Could not allocate memory for firmware image");
 		kfree(fw);
 		return -1;
 	}
@@ -1283,7 +1390,6 @@ dma_addr_t dma_map_single(struct device *dev, void *cpu_addr, size_t size,
 	if (dma_addr == ~0UL)
 		PERR("%s: virtual address %p not registered for DMA, called from: %p",
 		     __func__, cpu_addr, __builtin_return_address(0));
-
 
 	return dma_addr;
 }
@@ -1414,6 +1520,23 @@ struct page *alloc_pages(gfp_t gfp_mask, unsigned int order)
 }
 
 
+void *__alloc_page_frag(struct page_frag_cache *nc,
+                        unsigned int fragsz, gfp_t gfp_mask)
+{
+	struct page *page = alloc_pages(gfp_mask, fragsz / PAGE_SIZE);
+	if (!page) return nullptr;
+
+	return page->addr;
+}
+
+
+void __free_page_frag(void *addr)
+{
+	struct page *page = virt_to_head_page(addr);
+	__free_pages(page, 0xdeadbeef);
+}
+
+
 void __free_pages(struct page *page, unsigned int order)
 {
 	if (!atomic_dec_and_test(&page->_count)) {
@@ -1471,6 +1594,11 @@ void get_page(struct page *page)
 
 void put_page(struct page *page)
 {
+	if (!page) {
+		PWRN("put_page: page is zero called from: %p", __builtin_return_address(0));
+		return;
+	}
+
 	if (!atomic_dec_and_test(&page->_count))
 		return;
 

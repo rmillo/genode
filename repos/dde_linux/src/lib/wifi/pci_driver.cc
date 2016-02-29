@@ -6,7 +6,7 @@
  */
 
 /*
- * Copyright (C) 2012-2013 Genode Labs GmbH
+ * Copyright (C) 2012-2016 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
@@ -78,8 +78,7 @@ class Pci_driver
 			_dev->dev.driver   = &_drv->driver;
 
 			/* dummy dma mask used to mark device as DMA capable */
-			static u64 dma_mask = ~(u64)0;
-			_dev->dev.dma_mask = &dma_mask;
+			_dev->dev.dma_mask = ~(u64)0U;
 			_dev->dev.coherent_dma_mask = ~0;
 
 			/* read interrupt line */

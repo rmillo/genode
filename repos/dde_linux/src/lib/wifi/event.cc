@@ -6,7 +6,7 @@
  */
 
 /*
- * Copyright (C) 2014 Genode Labs GmbH
+ * Copyright (C) 2014-2016 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
@@ -126,6 +126,21 @@ int wait_for_completion_interruptible(struct completion *work)
 
 long wait_for_completion_interruptible_timeout(struct completion *work,
                                                unsigned long timeout)
+{
+	__wait_completion(work);
+	return 1;
+}
+
+
+int wait_for_completion_killable(struct completion *work)
+{
+	__wait_completion(work);
+	return 0;
+}
+
+
+long wait_for_completion_killable_timeout(struct completion *work,
+                                          unsigned long timeout)
 {
 	__wait_completion(work);
 	return 1;

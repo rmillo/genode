@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (C) 2014 Genode Labs GmbH
+ * Copyright (C) 2014-2016 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
@@ -277,7 +277,12 @@ static void run_timer(void *)
 			if (ctx->timeout > jiffies)
 				break;
 
-			ctx->timer->function(ctx->timer->data);
+			if (ctx->timer->function)
+				ctx->timer->function(ctx->timer->data);
+			else
+				PWRN("ctx: %p timer: %p timer-function is nullptr",
+				     ctx, ctx->timer);
+
 			_lx_timer->del(ctx->timer);
 		}
 
@@ -291,6 +296,9 @@ static void run_timer(void *)
  *******************/
 
 void init_timer(struct timer_list *timer) { }
+
+
+void init_timer_deferrable(struct timer_list *timer) { /* XXX */ }
 
 
 int mod_timer(struct timer_list *timer, unsigned long expires)

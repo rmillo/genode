@@ -55,7 +55,7 @@ int sock_create_lite(int family, int type, int protocol, struct socket **res)
 }
 
 
-int sock_create_kern(int family, int type, int proto,
+int sock_create_kern(struct net *net, int family, int type, int proto,
                      struct socket **res)
 {
 	struct socket *sock;

@@ -8,7 +8,7 @@
  */
 
 /*
- * Copyright (C) 2014 Genode Labs GmbH
+ * Copyright (C) 2014-2016 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
@@ -59,12 +59,16 @@ void lx_vprintf(char const *, va_list);
 
 #define BUG_ON(condition) do { if (condition) BUG(); } while(0)
 
+#define BUILD_BUG_ON_NOT_POWER_OF_2(n)          \
+	BUILD_BUG_ON((n) == 0 || (((n) & ((n) - 1)) != 0))
+
 
 /*********************
  ** linux/kconfig.h **
  *********************/
 
 #define IS_ENABLED(x) x
+#define config_enabled(cfg) 0
 
 
 /*********************
@@ -141,6 +145,11 @@ static inline int atomic_cmpxchg(atomic_t *v, int old, int n)
 	return cmpxchg(&v->counter, old, n);
 }
 
+static inline int atomic_xchg(atomic_t *v, int n)
+{
+	return xchg(&v->counter, n);
+}
+
 static inline int atomic_inc_not_zero_hint(atomic_t *v, int hint)
 {
 	int val, c = hint;
@@ -172,7 +181,21 @@ static inline int atomic_add_unless(atomic_t *v, int a, int u)
 	return ret != u;
 }
 
-#define smp_mb__before_atomic_dec()
+static inline int atomic_dec_if_positive(atomic_t *v)
+{
+	int c, old, dec;
+	c = atomic_read(v);
+	for (;;) {
+		dec = c - 1;
+		if (dec < 0) break;
+		old = atomic_cmpxchg((v), c, dec);
+		if (old == c) break;
+		c = old;
+	}
+	return dec;
+}
+
+#define smp_mb__before_atomic_dec() mb()
 
 
 /*******************************
@@ -180,6 +203,11 @@ static inline int atomic_add_unless(atomic_t *v, int a, int u)
  *******************************/
 
 #define ATOMIC_LONG_INIT(i) ATOMIC_INIT(i)
+
+static inline void atomic_long_set(atomic_long_t *l, long i)
+{
+	l->counter = i;
+}
 
 
 /*******************
@@ -190,6 +218,9 @@ static inline int atomic_add_unless(atomic_t *v, int a, int u)
 #define smp_mb() mb()
 #define smp_rmb() mb()
 #define smp_wmb() mb()
+#define smp_load_acquire(p)     *(p)
+#define smp_store_release(p, v) *(p) = v;
+#define smp_mb__before_atomic() mb()
 
 
 /****************
@@ -234,6 +265,7 @@ enum pageflags
  **********************/
 
 void flush_dcache_page(struct page *page);
+enum { ARCH_IMPLEMENTS_FLUSH_DCACHE_PAGE = 1 }; /* XXX */
 
 
 /*******************
@@ -349,6 +381,24 @@ typedef unsigned short mode_t;
 	unsigned long name[BITS_TO_LONGS(bits)]
 
 
+/**************************
+ ** linux/compiler-gcc.h **
+ **************************/
+
+#define uninitialized_var(x) x = x
+#ifdef __aligned
+#undef __aligned
+#endif
+#define __aligned(x)  __attribute__((aligned(x)))
+#define __noreturn    __attribute__((noreturn))
+
+#define barrier() __asm__ __volatile__("": : :"memory")
+
+#define OPTIMIZER_HIDE_VAR(var) __asm__ ("" : "=r" (var) : "0" (var))
+
+#define __visible __attribute__((externally_visible))
+
+
 /**********************
  ** linux/compiler.h **
  **********************/
@@ -379,6 +429,50 @@ typedef unsigned short mode_t;
 
 #define ACCESS_ONCE(x) (*(volatile typeof(x) *)&(x))
 
+static inline void __write_once_size(volatile void *p, void *res, int size)
+{
+	switch (size) {
+	case 1: *(volatile __u8 *)p = *(__u8 *)res; break;
+	case 2: *(volatile __u16 *)p = *(__u16 *)res; break;
+	case 4: *(volatile __u32 *)p = *(__u32 *)res; break;
+	case 8: *(volatile __u64 *)p = *(__u64 *)res; break;
+	default:
+		barrier();
+		__builtin_memcpy((void *)p, (const void *)res, size);
+		barrier();
+	}
+}
+
+#define WRITE_ONCE(x, val) \
+({                          \
+	union { typeof(x) __val; char __c[1]; } __u =   \
+	{ .__val = (__force typeof(x)) (val) }; \
+	__write_once_size(&(x), __u.__c, sizeof(x));    \
+	__u.__val;                  \
+})
+
+static inline void __read_once_size(const volatile void *p, void *res, int size)
+{
+	switch (size) {
+		case 1: *(__u8 *)res = *(volatile __u8 *)p; break;
+		case 2: *(__u16 *)res = *(volatile __u16 *)p; break;
+		case 4: *(__u32 *)res = *(volatile __u32 *)p; break;
+		case 8: *(__u64 *)res = *(volatile __u64 *)p; break;
+		default:
+			barrier();
+			__builtin_memcpy((void *)res, (const void *)p, size);
+			barrier();
+	}
+}
+
+#define READ_ONCE(x) \
+({                                               \
+	union { typeof(x) __val; char __c[1]; } __u; \
+	__read_once_size(&(x), __u.__c, sizeof(x));  \
+	__u.__val;                                   \
+})
+
+
 #define __attribute_const__
 #undef  __always_inline
 #define __always_inline
@@ -387,25 +481,8 @@ typedef unsigned short mode_t;
 
 #define __printf(a, b) __attribute__((format(printf, a, b)))
 
-#define noinline     __attribute__((noinline))
-
-
-/**************************
- ** linux/compiler-gcc.h **
- **************************/
-
-#define uninitialized_var(x) x = x
-#ifdef __aligned
-#undef __aligned
-#endif
-#define __aligned(x)  __attribute__((aligned(x)))
-#define __noreturn    __attribute__((noreturn))
-
-#define barrier() __asm__ __volatile__("": : :"memory")
-
-#define OPTIMIZER_HIDE_VAR(var) __asm__ ("" : "=r" (var) : "0" (var))
-
-#define __visible __attribute__((externally_visible))
+#define noinline __attribute__((noinline))
+#define noinline_for_stack noinline
 
 
 /********************
@@ -430,7 +507,7 @@ typedef unsigned short mode_t;
 
 
 /**********************
- ** linux/mm_types.h **
+ ** linux/mm-types.h **
  **********************/
 
 struct vm_operations_struct;
@@ -445,6 +522,18 @@ struct vm_area_struct
 	unsigned long vm_pgoff;
 
 	struct file * vm_file;
+};
+
+struct page_frag
+{
+	struct page *page;
+	__u16        offset;
+	__u16        size;
+};
+
+struct page_frag_cache
+{
+	bool pfmemalloc;
 };
 
 
@@ -483,6 +572,10 @@ struct vm_operations_struct {
 int get_user_pages_fast(unsigned long start, int nr_pages, int write, struct page **pages);
 int vm_insert_page(struct vm_area_struct *, unsigned long addr, struct page *);
 
+bool page_is_pfmemalloc(struct page *page);
+
+#define PAGE_ALIGNED(addr) IS_ALIGNED((unsigned long)addr, PAGE_SIZE)
+
 
 /*********************
  ** linux/vmalloc.h **
@@ -508,31 +601,32 @@ static inline void kunmap_atomic(void *addr) { }
  *****************/
 
 enum {
-	__GFP_DMA         = 0x00000001u,
-	__GFP_HIGHMEM     = 0x00000002u,
-	__GFP_DMA32       = 0x00000004u,
-	__GFP_MOVABLE     = 0x00000008u,
-	__GFP_WAIT        = 0x00000010u,
-	__GFP_HIGH        = 0x00000020u,
-	__GFP_IO          = 0x00000040u,
-	__GFP_FS          = 0x00000080u,
-	__GFP_COLD        = 0x00000100u,
-	__GFP_NOWARN      = 0x00000200u,
-	__GFP_REPEAT      = 0x00000400u,
-	__GFP_NOFAIL      = 0x00000800u,
-	__GFP_NORETRY     = 0x00001000u,
-	__GFP_MEMALLOC    = 0x00002000u,
-	__GFP_COMP        = 0x00004000u,
-	__GFP_ZERO        = 0x00008000u,
-	__GFP_NOMEMALLOC  = 0x00010000u,
-	__GFP_HARDWALL    = 0x00020000u,
-	__GFP_THISNODE    = 0x00040000u,
-	__GFP_RECLAIMABLE = 0x00080000u,
-	__GFP_KMEMCG      = 0x00100000u,
-	__GFP_NOTRACK     = 0x00200000u,
-	__GFP_NO_KSWAPD   = 0x00400000u,
-	__GFP_OTHER_NODE  = 0x00800000u,
-	__GFP_WRITE       = 0x01000000u,
+	__GFP_DMA            = 0x00000001u,
+	__GFP_HIGHMEM        = 0x00000002u,
+	__GFP_DMA32          = 0x00000004u,
+	__GFP_MOVABLE        = 0x00000008u,
+	__GFP_WAIT           = 0x00000010u,
+	__GFP_HIGH           = 0x00000020u,
+	__GFP_IO             = 0x00000040u,
+	__GFP_FS             = 0x00000080u,
+	__GFP_COLD           = 0x00000100u,
+	__GFP_NOWARN         = 0x00000200u,
+	__GFP_REPEAT         = 0x00000400u,
+	__GFP_NOFAIL         = 0x00000800u,
+	__GFP_NORETRY        = 0x00001000u,
+	__GFP_MEMALLOC       = 0x00002000u,
+	__GFP_COMP           = 0x00004000u,
+	__GFP_ZERO           = 0x00008000u,
+	__GFP_NOMEMALLOC     = 0x00010000u,
+	__GFP_HARDWALL       = 0x00020000u,
+	__GFP_THISNODE       = 0x00040000u,
+	__GFP_RECLAIMABLE    = 0x00080000u,
+	__GFP_KMEMCG         = 0x00100000u,
+	__GFP_NOTRACK        = 0x00200000u,
+	__GFP_DIRECT_RECLAIM = 0x00400000u,
+	__GFP_NO_KSWAPD      = 0x00400000u,
+	__GFP_OTHER_NODE     = 0x00800000u,
+	__GFP_WRITE          = 0x01000000u,
 
 	GFP_LX_DMA        = 0x80000000u,
 
@@ -556,6 +650,13 @@ unsigned long __get_free_page(gfp_t);
 unsigned long __get_free_pages(gfp_t, unsigned int);
 void free_pages(unsigned long, unsigned int);
 void __free_pages(struct page *page, unsigned int order);
+void __free_page_frag(void *addr);
+
+bool gfpflags_allow_blocking(const gfp_t gfp_flags);
+
+void *__alloc_page_frag(struct page_frag_cache *nc,
+                        unsigned int fragsz, gfp_t gfp_mask);
+
 
 
 /******************
@@ -577,6 +678,8 @@ void  kfree(const void *);
 void  kzfree(const void *);
 void *kmalloc(size_t size, gfp_t flags);
 void *kcalloc(size_t n, size_t size, gfp_t flags);
+void *kmalloc_array(size_t n, size_t size, gfp_t flags);
+void  kvfree(const void *);
 
 struct kmem_cache;
 struct kmem_cache *kmem_cache_create(const char *, size_t, size_t, unsigned long, void (*)(void *));
@@ -752,8 +855,10 @@ int del_timer_sync(struct timer_list * timer) { return del_timer(timer); }
  ***********************/
 
 enum {
-	WQ_MEM_RECLAIM,
-	WQ_CPU_INTENSIVE,
+	WQ_UNBOUND        = 1<<1,
+	WQ_MEM_RECLAIM    = 1<<3,
+	WQ_HIGHPRI        = 1<<4,
+	WQ_CPU_INTENSIVE  = 1<<5,
 };
 
 struct work_struct;
@@ -816,13 +921,15 @@ bool queue_delayed_work(struct workqueue_struct *, struct delayed_work *, unsign
 bool flush_delayed_work(struct delayed_work *dwork);
 bool queue_work(struct workqueue_struct *wq, struct work_struct *work);
 
+/* XXX gives incompatible pointers warning */
 #define DECLARE_DELAYED_WORK(n, f) \
-	struct delayed_work n
+	struct delayed_work n = { { .function = f } };
 
 bool mod_delayed_work(struct workqueue_struct *, struct delayed_work *,
                       unsigned long);
 
 extern struct workqueue_struct *system_wq;
+extern struct workqueue_struct *system_power_efficient_wq;
 
 enum {
 	WORK_STRUCT_STATIC      = 0,
@@ -960,6 +1067,8 @@ static inline size_t min(size_t a, size_t b) {
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
+#define FIELD_SIZEOF(t, f) (sizeof(((t*)0)->f))
+
 #define BUILD_BUG_ON(condition)
 
 #define _RET_IP_  (unsigned long)__builtin_return_address(0)
@@ -967,8 +1076,18 @@ static inline size_t min(size_t a, size_t b) {
 void might_sleep();
 #define might_sleep_if(cond) do { if (cond) might_sleep(); } while (0)
 
-#define INT_MAX  ((int)(~0U>>1))
-#define UINT_MAX (~0U)
+#define INT_MAX    ((int)(~0U>>1))
+#define UINT_MAX   (~0U)
+#define ULONG_MAX  (~0UL)
+#define SIZE_MAX   (~(size_t)0)
+
+#define U8_MAX   ((u8)~0U)
+#define S8_MAX   ((s8)(U8_MAX>>1))
+#define S8_MIN   ((s8)(-S8_MAX - 1))
+#define U16_MAX  ((u16)~0U)
+#define U32_MAX  ((u32)~0U)
+#define S32_MAX  ((s32)(U32_MAX>>1))
+#define S32_MIN  ((s32)(-S32_MAX - 1))
 
 char *kasprintf(gfp_t gfp, const char *fmt, ...);
 int kstrtouint(const char *s, unsigned int base, unsigned int *res);
@@ -1030,8 +1149,15 @@ int sscanf(const char *, const char *, ...);
 #define __ALIGN_KERNEL(x, a)          __ALIGN_KERNEL_MASK(x, (typeof(x))(a) - 1)
 #define __ALIGN_KERNEL_MASK(x, mask)  (((x) + (mask)) & ~(mask))
 
+/* XXX */
+#define PAGE_ALIGN(addr) ALIGN(addr, PAGE_SIZE)
+#define IS_ALIGNED(x, a) (((x) & ((typeof(x))(a) - 1)) == 0)
+
 #define swap(a, b) \
 	do { typeof(a) __tmp = (a); (a) = (b); (b) = __tmp; } while (0)
+
+#define __round_mask(x, y) ((__typeof__(x))((y)-1))
+#define round_down(x, y)   ((x) & ~__round_mask(x, y))
 
 
 /********************
@@ -1073,6 +1199,8 @@ static inline int no_printk(const char *fmt, ...) { return 0; }
 #define pr_debug(fmt, ...) no_printk(KERN_DEBUG  fmt, ##__VA_ARGS__)
 #endif
 
+#define pr_warn_ratelimited(fmt, ...) printk(KERN_WARNING fmt, ##__VA_ARGS__)
+
 enum {
 	DUMP_PREFIX_OFFSET
 };
@@ -1099,6 +1227,8 @@ static inline void print_hex_dump(const char *level, const char *prefix_str,
 
 void hex_dump_to_buffer(const void *buf, size_t len, int rowsize, int groupsize, char *linebuf, size_t linebuflen, bool ascii);
 void dump_stack(void);
+
+unsigned long int_sqrt(unsigned long);
 
 
 /*************************************
@@ -1144,10 +1274,15 @@ struct __una_u16 { u16 x; } __attribute__((packed));
 struct __una_u32 { u32 x; } __attribute__((packed));
 struct __una_u64 { u64 x; } __attribute__((packed));
 
-u32 __get_unaligned_cpu32(const void *p);
+static inline void put_unaligned_le16(u16 val, void *p)
+{
+	*((__le16 *)p) = cpu_to_le16(val);
+}
 
-void put_unaligned_le16(u16 val, void *p);
-void put_unaligned_be16(u16 val, void *p);
+static inline void put_unaligned_be16(u16 val, void *p)
+{
+	*((__be16 *)p) = cpu_to_be16(val);
+}
 
 static inline void put_unaligned_le32(u32 val, void *p)
 {
@@ -1164,6 +1299,12 @@ static inline u32 get_unaligned_le32(const void *p)
 {
 	const struct __una_u32 *ptr = (const struct __una_u32 *)p;
 	return ptr->x;
+}
+
+static inline u16 get_unaligned_be16(const void *p)
+{
+	const __u8 *be = (__u8*)p;
+	return (be[1]<<0)|(be[0]<<8);
 }
 
 void put_unaligned_le64(u64 val, void *p);
@@ -1195,6 +1336,13 @@ static inline void le32_add_cpu(__le32 *var, u32 val)
 }
 
 
+static inline u32 __get_unaligned_cpu32(const void *p)
+{
+	const struct __una_u32 *ptr = (const struct __una_u32 *)p;
+	return ptr->x;
+}
+
+
 /**********************
  ** linux/if_ether.h **
  **********************/
@@ -1204,11 +1352,36 @@ enum {
 	ETH_HLEN     = 14,     /* total octets in header */
 	ETH_DATA_LEN = 1500,   /* Max. octets in payload */
 	ETH_P_8021Q  = 0x8100, /* 802.1Q VLAN Extended Header  */
+	ETH_P_8021AD = 0x88A8, /* 802.1ad Service VLAN         */
+	ETH_P_PAE    = 0x888E, /* Port Access Entity (IEEE 802.1X) */
+
+	ETH_P_802_3_MIN = 0x0600,
 
 	ETH_FRAME_LEN = 1514,
 };
 
 #define ETH_P_TDLS     0x890D          /* TDLS */
+
+
+/****************************************
+ ** asm-generic/bitops/const_hweight.h **
+ ****************************************/
+
+#define __const_hweight8(w)     \
+	( (!!((w) & (1ULL << 0))) + \
+	  (!!((w) & (1ULL << 1))) + \
+	  (!!((w) & (1ULL << 2))) + \
+	  (!!((w) & (1ULL << 3))) + \
+	  (!!((w) & (1ULL << 4))) + \
+	  (!!((w) & (1ULL << 5))) + \
+	  (!!((w) & (1ULL << 6))) + \
+	  (!!((w) & (1ULL << 7))) )
+
+#define hweight8(w)  (__const_hweight8(w))
+
+unsigned int hweight16(unsigned int w);
+unsigned int hweight32(unsigned int w);
+unsigned int hweight64(__u64 w);
 
 
 /**********************************
@@ -1242,6 +1415,8 @@ enum {
 long find_next_zero_bit_le(const void *addr,
                            unsigned long size, unsigned long offset);
 
+unsigned long find_last_bit(const unsigned long *addr,
+                            unsigned long size);
 
 #include <asm-generic/bitops/__ffs.h>
 #include <asm-generic/bitops/__fls.h>
@@ -1298,26 +1473,10 @@ static inline __u16 ror16(__u16 word, unsigned int shift)
 	return (word >> shift) | (word << (16 - shift));
 }
 
-
-/****************************************
- ** asm-generic/bitops/const_hweight.h **
- ****************************************/
-
-#define __const_hweight8(w)     \
-	( (!!((w) & (1ULL << 0))) + \
-	  (!!((w) & (1ULL << 1))) + \
-	  (!!((w) & (1ULL << 2))) + \
-	  (!!((w) & (1ULL << 3))) + \
-	  (!!((w) & (1ULL << 4))) + \
-	  (!!((w) & (1ULL << 5))) + \
-	  (!!((w) & (1ULL << 6))) + \
-	  (!!((w) & (1ULL << 7))) )
-
-#define hweight8(w)  (__const_hweight8(w))
-
-unsigned int hweight16(unsigned int w);
-unsigned int hweight32(unsigned int w);
-unsigned int hweight64(__u64 w);
+static inline unsigned long hweight_long(unsigned long w)
+{
+	return sizeof(w) == 4 ? hweight32(w) : hweight64(w);
+}
 
 
 /*********************
@@ -1676,14 +1835,15 @@ struct class
 struct dma_parms;
 
 /* DEVICE */
-struct device {
+struct device
+{
 	const char                    *name;
 	struct device                 *parent;
 	struct kobject                 kobj;
 	const struct device_type      *type;
 	struct device_driver          *driver;
 	void                          *platform_data;
-	u64                           *dma_mask; /* needed by usb/hcd.h */
+	u64                            dma_mask; /* needed by usb/hcd.h */
 	u64                            coherent_dma_mask; /* omap driver */
 	struct dev_pm_info             power;
 	dev_t                          devt;
@@ -1738,8 +1898,13 @@ int         dev_to_node(struct device *dev);
 void        set_dev_node(struct device *dev, int node);
 
 struct device *device_create(struct class *cls, struct device *parent,
-		dev_t devt, void *drvdata,
-		const char *fmt, ...);
+                             dev_t devt, void *drvdata,
+                             const char *fmt, ...);
+struct device *device_create_with_groups(struct class *cls,
+                                         struct device *parent, dev_t devt,
+                                         void *drvdata,
+                                         const struct attribute_group **groups,
+                                         const char *fmt, ...);
 int  device_add(struct device *dev);
 void device_destroy(struct class *cls, dev_t devt);
 int  device_register(struct device *dev);
@@ -1798,6 +1963,9 @@ struct class *__class_create(struct module *owner,
 int class_register(struct class *cls);
 void class_unregister(struct class *cls);
 void class_destroy(struct class *cls);
+struct device *class_find_device(struct class *cls, struct device *start,
+                                 const void *data,
+                                 int (*match)(struct device *, const void *));
 
 typedef void (*dr_release_t)(struct device *dev, void *res);
 typedef int (*dr_match_t)(struct device *dev, void *res, void *match_data);
@@ -1805,8 +1973,10 @@ typedef int (*dr_match_t)(struct device *dev, void *res, void *match_data);
 void *devres_alloc(dr_release_t release, size_t size, gfp_t gfp);
 void  devres_add(struct device *dev, void *res);
 int   devres_destroy(struct device *dev, dr_release_t release,
-		dr_match_t match, void *match_data);
+                     dr_match_t match, void *match_data);
 void  devres_free(void *res);
+int devres_release(struct device *dev, dr_release_t release,
+                   dr_match_t match, void *match_data);
 
 void *devm_kzalloc(struct device *dev, size_t size, gfp_t gfp);
 
@@ -2370,6 +2540,7 @@ void list_replace_rcu(struct list_head *, struct list_head *);
 
 extern unsigned long jiffies;
 
+unsigned int jiffies_to_usecs(const unsigned long);
 unsigned int jiffies_to_msecs(const unsigned long);
 unsigned long usecs_to_jiffies(const unsigned int u);
 unsigned long msecs_to_jiffies(const unsigned int);
@@ -2543,16 +2714,23 @@ void module_put(struct module *);
 void __module_get(struct module *module);
 int try_module_get(struct module *);
 
+static inline bool module_sig_ok(struct module *module) { return true; }
+
+#define module_name(mod) "foobar"
 
 /*************************
  ** linux/moduleparam.h **
  *************************/
 
+#define __MODULE_INFO(tag, name, info)
 #define module_param(name, type, perm)
 #define module_param_named(name, value, type, perm)
 #define MODULE_PARM_DESC(_parm, desc)
 #define kparam_block_sysfs_write(name)
 #define kparam_unblock_sysfs_write(name)
+
+static inline void kernel_param_lock(struct module *mod) { }
+static inline void kernel_param_unlock(struct module *mod) { }
 
 
 /***********************************
@@ -2608,7 +2786,7 @@ struct percpu_counter
 	s64 count;
 };
 
-static inline int percpu_counter_init(struct percpu_counter *fbc, s64 amount)
+static inline int percpu_counter_init(struct percpu_counter *fbc, s64 amount, gfp_t gfp)
 {
 	fbc->count = amount;
 	return 0;
@@ -2720,6 +2898,15 @@ void eth_random_addr(u8 *addr);
 static inline void eth_broadcast_addr(u8 *addr) {
 	memset(addr, 0xff, ETH_ALEN); }
 
+static inline void eth_zero_addr(u8 *addr) {
+	memset(addr, 0x00, ETH_ALEN); }
+
+static inline void ether_addr_copy(u8 *dst, const u8 *src)
+{
+	*(u32 *)dst      = *(const u32 *)src;
+	*(u16 *)(dst+ 4) = *(const u16 *)(src + 4);
+}
+
 static inline bool is_broadcast_ether_addr(const u8 *addr)
 {
 	return (*(const u16 *)(addr + 0) &
@@ -2740,6 +2927,11 @@ static inline bool is_multicast_ether_addr(const u8 *addr)
 	return 0x01 & addr[0];
 }
 
+static inline bool is_multicast_ether_addr_64bits(const u8 addr[6+2])
+{
+	return is_multicast_ether_addr(addr);
+}
+
 static inline bool ether_addr_equal_64bits(const u8 addr1[6+2], const u8 addr2[6+2])
 {
 	u64 fold = (*(const u64 *)addr1) ^ (*(const u64 *)addr2);
@@ -2747,6 +2939,32 @@ static inline bool ether_addr_equal_64bits(const u8 addr1[6+2], const u8 addr2[6
 	return (fold << 16) == 0;
 }
 
+static inline bool is_unicast_ether_addr(const u8 *addr) {
+	return !(0x01 & addr[0]); }
+
+static inline bool is_zero_ether_addr(const u8 *addr)
+{
+	return !(addr[0] | addr[1] | addr[2] | addr[3] | addr[4] | addr[5]);
+}
+
+/* Reserved Ethernet Addresses per IEEE 802.1Q */
+static const u8 eth_reserved_addr_base[ETH_ALEN] __aligned(2) =
+{ 0x01, 0x80, 0xc2, 0x00, 0x00, 0x00 };
+
+static inline bool is_link_local_ether_addr(const u8 *addr)
+{
+	__be16 *a = (__be16 *)addr;
+	static const __be16 *b = (const __be16 *)eth_reserved_addr_base;
+	static const __be16 m = cpu_to_be16(0xfff0);
+
+	return ((a[0] ^ b[0]) | (a[1] ^ b[1]) | ((a[2] ^ b[2]) & m)) == 0;
+}
+
+static inline bool eth_proto_is_802_3(__be16 proto)
+{
+	proto &= htons(0xFF00);
+	return (u16)proto >= (u16)htons(ETH_P_802_3_MIN);
+}
 
 /************************
  ** net/netns/packet.h **
@@ -2839,6 +3057,8 @@ static inline void put_net(struct net *net) { }
 static inline int net_eq(const struct net *net1, const struct net *net2) {
 	return 1; }
 
+typedef struct { unsigned dummy; } possible_net_t;
+
 struct net *get_net_ns_by_pid(pid_t pid);
 struct net *get_net_ns_by_fd(int pid);
 
@@ -2850,6 +3070,8 @@ void release_net(struct net *net);
 
 int  rt_genid(struct net *);
 void rt_genid_bump(struct net *);
+
+int peernet2id(struct net *net, struct net *peer);
 
 
 /*************************
@@ -2901,8 +3123,20 @@ enum {
 	NETDEV_UNREGISTER_FINAL   = 0x0011,
 	NETDEV_RELEASE            = 0x0012,
 	NETDEV_JOIN               = 0x0014,
-
+	NETDEV_BONDING_INFO       = 0x0019,
 };
+
+enum {
+	NET_NAME_UNKNOWN = 0,
+	NET_NAME_ENUM    = 1,
+	NET_NAME_USER    = 3,
+};
+
+enum netdev_priv_flags
+{
+	IFF_EBRIDGE = 1<<1,
+};
+
 
 #include <linux/netdev_features.h>
 
@@ -2953,10 +3187,13 @@ typedef u16 (*select_queue_fallback_t)(struct net_device *dev,
                                        struct sk_buff *skb);
 
 struct ifla_vf_info;
+struct ifla_vf_stats;
 struct nlattr;
 struct ndmsg;
 struct netlink_callback;
 struct nlmsghdr;
+
+struct netdev_phys_item_id;
 
 struct net_device_ops
 {
@@ -2976,24 +3213,35 @@ struct net_device_ops
 	                              struct ifmap *map);
 	void        (*ndo_tx_timeout) (struct net_device *dev);
 	int         (*ndo_change_mtu)(struct net_device *dev, int new_mtu);
+	struct rtnl_link_stats64* (*ndo_get_stats64)(struct net_device *dev,
+	                                             struct rtnl_link_stats64 *storage);
 	int         (*ndo_set_features)(struct net_device *dev, netdev_features_t features);
 	int         (*ndo_set_vf_mac)(struct net_device *dev,
 	                              int queue, u8 *mac);
 	int         (*ndo_set_vf_vlan)(struct net_device *dev,
 	                               int queue, u16 vlan, u8 qos);
+	int         (*ndo_set_vf_rate)(struct net_device *dev,
+	                               int vf, int min_tx_rate,
+	                               int max_tx_rate);
 	int         (*ndo_set_vf_tx_rate)(struct net_device *dev,
 	                                  int vf, int rate);
 	int         (*ndo_set_vf_spoofchk)(struct net_device *dev,
 	                                   int vf, bool setting);
+	int         (*ndo_set_vf_trust)(struct net_device *dev,
+	                                int vf, bool setting);
 	int         (*ndo_get_vf_config)(struct net_device *dev,
 	                                 int vf,
 	                                 struct ifla_vf_info *ivf);
 	int         (*ndo_set_vf_link_state)(struct net_device *dev,
 	                                     int vf, int link_state);
+	int         (*ndo_get_vf_stats)(struct net_device *dev,
+	                                int vf, struct ifla_vf_stats *vf_stats);
 	int         (*ndo_set_vf_port)(struct net_device *dev, int vf,
 	                               struct nlattr *port[]);
 	int         (*ndo_get_vf_port)(struct net_device *dev,
 	                               int vf, struct sk_buff *skb);
+	int         (*ndo_set_vf_rss_query_en)(struct net_device *dev,
+	                                       int vf, bool setting);
 	int         (*ndo_del_slave)(struct net_device *dev,
 	                             struct net_device *slave_dev);
 	int         (*ndo_add_slave)(struct net_device *dev,
@@ -3002,23 +3250,32 @@ struct net_device_ops
 	                           struct nlattr *tb[],
 	                           struct net_device *dev,
 	                           const unsigned char *addr,
+	                           u16 vid,
 	                           u16 flags);
 	int         (*ndo_fdb_del)(struct ndmsg *ndm,
 	                           struct nlattr *tb[],
 	                           struct net_device *dev,
-	                           const unsigned char *addr);
+	                           const unsigned char *addr,
+	                           u16 vid);
 	int         (*ndo_fdb_dump)(struct sk_buff *skb,
 	                            struct netlink_callback *cb,
 	                            struct net_device *dev,
+	                            struct net_device *filter_dev,
 	                            int idx);
 	int         (*ndo_bridge_setlink)(struct net_device *dev,
-	                                  struct nlmsghdr *nlh);
+	                                  struct nlmsghdr *nlh,
+	                                  u16 flags);
 	int         (*ndo_bridge_getlink)(struct sk_buff *skb,
 	                                  u32 pid, u32 seq,
 	                                  struct net_device *dev,
-	                                  u32 filter_mask);
+	                                  u32 filter_mask,
+	                                  int nlflags);
 	int         (*ndo_bridge_dellink)(struct net_device *dev,
-	                                  struct nlmsghdr *nlh);
+	                                  struct nlmsghdr *nlh,
+	                                  u16 flags);
+	int         (*ndo_get_iflink)(const struct net_device *dev);
+	// int         (*ndo_change_proto_down)(struct net_device *dev,
+	//                                      bool proto_down);
 };
 
 struct net_device_stats
@@ -3059,7 +3316,23 @@ struct netdev_queue
 {
 	struct net_device *dev;
 	int numa_node;
+
+	unsigned long state;
 };
+
+enum {
+	NETDEV_QUEUE_START = 1<<1,
+};
+
+struct pcpu_sw_netstats {
+	u64     rx_packets;
+	u64     rx_bytes;
+	u64     tx_packets;
+	u64     tx_bytes;
+	struct u64_stats_sync   syncp;
+};
+
+#define netdev_alloc_pcpu_stats(type) alloc_percpu(type)
 
 /* NET_DEVICE */
 struct net_device
@@ -3072,10 +3345,14 @@ struct net_device
 	unsigned long       base_addr;  /* device I/O address   */
 	int         irq;        /* device IRQ number    */
 
+	atomic_t carrier_changes;
+
 	u32            features;
 	u32            hw_features;
 
 	struct net_device_stats      stats;
+	atomic_long_t       tx_dropped;
+
 	const struct net_device_ops *netdev_ops;
 	const struct ethtool_ops *ethtool_ops;
 
@@ -3128,6 +3405,19 @@ struct net_device
 	struct hlist_node   index_hlist;
 
 	enum {
+		NETREG_UNINITIALIZED=0,
+		NETREG_REGISTERED,
+		// NETREG_UNREGISTERING,
+		// NETREG_UNREGISTERED,
+		// NETREG_RELEASED,
+		// NETREG_DUMMY,
+	} reg_state;
+
+	union {
+		struct pcpu_sw_netstats  *tstats;
+	};
+
+	enum {
 		RTNL_LINK_INITIALIZED,
 		RTNL_LINK_INITIALIZING,
 	} rtnl_link_state:16;
@@ -3147,6 +3437,8 @@ struct net_device
 	int group;
 
 	void *lx_nic_device; /* our own Nic_device */
+
+	bool proto_down;
 };
 
 
@@ -3209,7 +3501,11 @@ bool netif_xmit_frozen_or_stopped(const struct netdev_queue *dev_queue);
 static inline void netif_addr_lock_bh(struct net_device *dev)   { }
 static inline void netif_addr_unlock_bh(struct net_device *dev) { }
 
-void netdev_set_default_ethtool_ops(struct net_device *dev, const struct ethtool_ops *ops);
+static inline void netdev_set_default_ethtool_ops(struct net_device *dev,
+                                                const struct ethtool_ops *ops)
+{
+	dev->ethtool_ops = ops;
+}
 int netdev_mc_empty(struct net_device *);
 unsigned netdev_mc_count(struct net_device * dev);
 int register_netdev(struct net_device *);
@@ -3226,7 +3522,8 @@ static inline void unregister_netdevice(struct net_device *dev)
 struct net_device *netdev_master_upper_dev_get(struct net_device *dev);
 void netdev_state_change(struct net_device *dev);
 int call_netdevice_notifiers(unsigned long val, struct net_device *dev);
-struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name, void (*setup)(struct net_device *), unsigned int txqs, unsigned int rxqs);
+struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name, unsigned char name_assign_type,
+                                    void (*setup)(struct net_device *), unsigned int txqs, unsigned int rxqs);
 struct netdev_notifier_info;
 struct net_device * netdev_notifier_info_to_dev(struct netdev_notifier_info *info);
 int register_netdevice_notifier(struct notifier_block *nb);
@@ -3252,7 +3549,7 @@ struct net_device *dev_get_by_name(struct net *net, const char *name);
 struct net_device *dev_get_by_name_rcu(struct net *net, const char *name);
 int dev_queue_xmit(struct sk_buff *skb);
 struct netdev_phys_port_id;
-int dev_get_phys_port_id(struct net_device *dev, struct netdev_phys_port_id *ppid);
+int dev_get_phys_port_id(struct net_device *dev, struct netdev_phys_item_id *ppid);
 unsigned int dev_get_flags(const struct net_device *);
 struct rtnl_link_stats64 *dev_get_stats(struct net_device *dev, struct rtnl_link_stats64 *storage);
 int dev_change_net_namespace(struct net_device *, struct net *, const char *);
@@ -3286,6 +3583,10 @@ int dev_mc_add(struct net_device *dev, const unsigned char *addr);
 int dev_mc_add_excl(struct net_device *dev, const unsigned char *addr);
 int dev_mc_del(struct net_device *dev, const unsigned char *addr);
 
+int dev_change_proto_down(struct net_device *dev, bool proto_down);
+int dev_get_iflink(const struct net_device *dev);
+int dev_get_phys_port_name(struct net_device *dev, char *name, size_t len);
+
 enum {
 	LL_MAX_HEADER  = 96, /* XXX check CONFIG_WLAN_MESH */
 };
@@ -3310,6 +3611,8 @@ extern rwlock_t             dev_base_lock;
 
 #define for_each_netdev(net, d)     \
 	list_for_each_entry(d, &(net)->dev_base_head, dev_list)
+#define for_each_netdev_safe(net, d, n) \
+	list_for_each_entry_safe(d, n, &(net)->dev_base_head, dev_list)
 #define for_each_netdev_rcu(net, d)     \
 	list_for_each_entry_rcu(d, &(net)->dev_base_head, dev_list)
 
@@ -3330,6 +3633,7 @@ enum {
 
 struct napi_gro_cb
 {
+	u16 flush;
 	u16 count;
 	u8  same_flow;
 	u8 free;
@@ -3404,6 +3708,50 @@ int __hw_addr_sync(struct netdev_hw_addr_list *to_list, struct netdev_hw_addr_li
 void __hw_addr_unsync(struct netdev_hw_addr_list *to_list, struct netdev_hw_addr_list *from_list, int addr_len);
 void __hw_addr_init(struct netdev_hw_addr_list *list);
 
+struct napi_struct
+{
+	int (*poll)(struct napi_struct *, int);
+	struct net_device *dev;
+};
+
+enum { MAX_PHYS_ITEM_ID_LEN = 32 };
+
+struct netdev_phys_item_id {
+	unsigned char id[MAX_PHYS_ITEM_ID_LEN];
+	unsigned char id_len;
+};
+
+struct offload_callbacks {
+	struct sk_buff  *(*gso_segment)(struct sk_buff *skb, netdev_features_t features);
+	struct sk_buff **(*gro_receive)(struct sk_buff **head, struct sk_buff *skb);
+	int              (*gro_complete)(struct sk_buff *skb, int nhoff);
+};
+
+struct packet_offload
+{
+	__be16 type;
+	u16 priority;
+	struct offload_callbacks callbacks;
+	struct list_head list;
+};
+
+/* XXX */
+#define HARD_TX_LOCK(dev, txq, cpu)
+#define HARD_TX_UNLOCK(dev, txq)
+
+void netif_napi_add(struct net_device *dev, struct napi_struct *napi,
+                    int (*poll)(struct napi_struct *, int), int weight);
+void netif_napi_del(struct napi_struct *napi);
+
+typedef int gro_result_t;
+
+gro_result_t napi_gro_receive(struct napi_struct *napi, struct sk_buff *skb);
+void napi_gro_flush(struct napi_struct *napi, bool flush_old);
+
+int init_dummy_netdev(struct net_device *dev);
+
+void dev_add_offload(struct packet_offload *po);
+
 
 /*************************
  ** linux/percpu-defs.h **
@@ -3426,32 +3774,6 @@ void __hw_addr_init(struct netdev_hw_addr_list *list);
  *********************/
 
 #include <linux/lockdep.h>
-
-
-/*************************
- ** linux/etherdevice.h **
- *************************/
-
-static inline bool is_unicast_ether_addr(const u8 *addr) {
-	return !(0x01 & addr[0]); }
-
-static inline bool is_zero_ether_addr(const u8 *addr)
-{
-	return !(addr[0] | addr[1] | addr[2] | addr[3] | addr[4] | addr[5]);
-}
-
-/* Reserved Ethernet Addresses per IEEE 802.1Q */
-static const u8 eth_reserved_addr_base[ETH_ALEN] __aligned(2) =
-{ 0x01, 0x80, 0xc2, 0x00, 0x00, 0x00 };
-
-static inline bool is_link_local_ether_addr(const u8 *addr)
-{
-	__be16 *a = (__be16 *)addr;
-	static const __be16 *b = (const __be16 *)eth_reserved_addr_base;
-	static const __be16 m = cpu_to_be16(0xfff0);
-
-	return ((a[0] ^ b[0]) | (a[1] ^ b[1]) | ((a[2] ^ b[2]) & m)) == 0;
-}
 
 
 /******************
@@ -3493,6 +3815,7 @@ void wake_up_interruptible_poll(wait_queue_head_t *, int);
 void prepare_to_wait(wait_queue_head_t *, wait_queue_t *, int);
 void prepare_to_wait_exclusive(wait_queue_head_t *, wait_queue_t *, int);
 void finish_wait(wait_queue_head_t *, wait_queue_t *);
+long wait_woken(wait_queue_t *wait, unsigned mode, long timeout);
 
 int  autoremove_wake_function(wait_queue_t *, unsigned, int, void *);
 void add_wait_queue(wait_queue_head_t *, wait_queue_t *);
@@ -3526,14 +3849,15 @@ void __wait_event(wait_queue_head_t);
 	})
 
 
-/************************
- ** linux/capability.h **
- ************************/
+/*****************************
+ ** uapi/linux/capability.h **
+ *****************************/
 
 enum {
-	CAP_NET_ADMIN = 12,
-	CAP_NET_RAW   = 13,
-	CAP_SYS_ADMIN = 21,
+	CAP_NET_BROADCAST = 11,
+	CAP_NET_ADMIN     = 12,
+	CAP_NET_RAW       = 13,
+	CAP_SYS_ADMIN     = 21,
 };
 
 bool capable(int cap);
@@ -3740,6 +4064,7 @@ void dma_free_coherent(struct device *, size_t size, void *vaddr, dma_addr_t bus
 
 int dma_set_coherent_mask(struct device *dev, u64 mask);
 void *dma_zalloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle, gfp_t flag);
+static inline int is_device_dma_capable(struct device *dev) { return dev->dma_mask; }
 
 
 /************************
@@ -3751,10 +4076,12 @@ struct completion { unsigned done; };
 void complete(struct completion *);
 void complete_all(struct completion *);
 void init_completion(struct completion *x);
+int wait_for_completion_killable(struct completion *x);
 unsigned long wait_for_completion_timeout(struct completion *x, unsigned long timeout);
 void wait_for_completion(struct completion *x);
 int wait_for_completion_interruptible(struct completion *x);
 long wait_for_completion_interruptible_timeout(struct completion *x, unsigned long timeout);
+long wait_for_completion_killable_timeout(struct completion *x, unsigned long timeout);
 
 
 /**********************
@@ -3826,6 +4153,17 @@ int request_threaded_irq(unsigned int irq, irq_handler_t handler, irq_handler_t 
 
 void tasklet_disable(struct tasklet_struct *t);
 void tasklet_enable(struct tasklet_struct *t);
+
+
+/***********************
+ ** uapi/linux/uuid.h **
+ ***********************/
+
+typedef struct uuid_le uuid_le;
+struct uuid_le
+{
+	__u8 b[16];
+};
 
 
 /*****************
@@ -4012,6 +4350,12 @@ static inline long IS_ERR_OR_NULL(const void *ptr) {
 
 static inline long PTR_ERR(const void *ptr) { return (long) ptr; }
 
+static inline int __must_check PTR_ERR_OR_ZERO(const void *ptr)
+{
+	if (IS_ERR(ptr)) return PTR_ERR(ptr);
+	else             return 0;
+}
+
 
 /*****************
 ** linux/uio.h **
@@ -4031,6 +4375,18 @@ struct kvec
 	size_t iov_len;
 };
 
+struct iov_iter {
+	int type;
+	size_t iov_offset;
+	size_t count;
+	union {
+		const struct iovec *iov;
+		const struct kvec *kvec;
+		const struct bio_vec *bvec;
+	};
+	unsigned long nr_segs;
+};
+
 static inline size_t iov_length(const struct iovec *iov, unsigned long nr_segs)
 {
 	unsigned long seg;
@@ -4041,8 +4397,25 @@ static inline size_t iov_length(const struct iovec *iov, unsigned long nr_segs)
 	return ret;
 }
 
+static inline size_t iov_iter_count(struct iov_iter *i) {
+	return i->count; }
+
 int memcpy_fromiovec(unsigned char *kdata, struct iovec *iov, int len);
 int memcpy_toiovec(struct iovec *iov, unsigned char *kdata, int len);
+
+void iov_iter_advance(struct iov_iter *i, size_t bytes);
+
+size_t copy_page_to_iter(struct page *page, size_t offset, size_t bytes, struct iov_iter *i);
+size_t copy_page_from_iter(struct page *page, size_t offset, size_t bytes, struct iov_iter *i);
+size_t copy_to_iter(void *addr, size_t bytes, struct iov_iter *i);
+size_t copy_from_iter(void *addr, size_t bytes, struct iov_iter *i);
+size_t copy_from_iter_nocache(void *addr, size_t bytes, struct iov_iter *i);
+
+ssize_t iov_iter_get_pages(struct iov_iter *i, struct page **pages,
+                           size_t maxsize, unsigned maxpages, size_t *start);
+
+size_t csum_and_copy_to_iter(void *addr, size_t bytes, __wsum *csum, struct iov_iter *i);
+size_t csum_and_copy_from_iter(void *addr, size_t bytes, __wsum *csum, struct iov_iter *i);
 
 
 /**********************
@@ -4074,18 +4447,37 @@ void *phys_to_virt(unsigned long address);
 #define readb(addr) (*(volatile uint8_t  *)(addr))
 
 
+/***********************
+ ** linux/if_bridge.h **
+ ***********************/
+
+enum {
+	BR_HAIRPIN_MODE         = BIT(0),
+	BR_BPDU_GUARD           = BIT(1),
+	BR_ROOT_BLOCK           = BIT(2),
+	BR_MULTICAST_FAST_LEAVE = BIT(3),
+	BR_LEARNING             = BIT(5),
+	BR_FLOOD                = BIT(6),
+	BR_PROXYARP             = BIT(8),
+	BR_LEARNING_SYNC        = BIT(9),
+	BR_PROXYARP_WIFI        = BIT(10),
+};
+
 /*********************
  ** linux/if_vlan.h **
  *********************/
 
 enum {
 	VLAN_HLEN       = 4,
+	VLAN_ETH_HLEN   = 18,
 	VLAN_PRIO_SHIFT = 13,
 	VLAN_PRIO_MASK  = 0xe000,
+	VLAN_VID_MASK   = 0x0fff,
 };
 
 struct vlan_hdr
 {
+	__be16 h_vlan_TCI;
 	__be16 h_vlan_encapsulated_proto;
 };
 
@@ -4119,6 +4511,7 @@ void *__alloc_percpu(size_t size, size_t align);
 #define per_cpu_ptr(ptr, cpu)   ({ (void)(cpu);(typeof(*(ptr)) *)(ptr); })
 #define __get_cpu_var(var) var
 
+#define this_cpu_ptr(ptr) ptr
 #define this_cpu_inc(pcp) pcp += 1
 #define this_cpu_dec(pcp) pcp -= 1
 
@@ -4152,6 +4545,24 @@ int res_counter_charge_nofail(struct res_counter *counter, unsigned long val, st
 u64 res_counter_uncharge(struct res_counter *counter, unsigned long val);
 u64 res_counter_read_u64(struct res_counter *counter, int member);
 
+
+/**************************
+ ** linux/page_counter.h **
+ **************************/
+
+struct page_counter
+{
+	atomic_long_t count;
+	unsigned long limit;
+};
+
+static inline unsigned long page_counter_read(struct page_counter *counter) {
+	return atomic_long_read(&counter->count); }
+
+void page_counter_charge(struct page_counter *counter, unsigned long nr_pages);
+void page_counter_uncharge(struct page_counter *counter, unsigned long nr_pages);
+
+
 /************************
  ** linux/memcontrol.h **
  ************************/
@@ -4162,16 +4573,12 @@ enum { UNDER_LIMIT, SOFT_LIMIT, OVER_LIMIT };
 
 void sock_update_memcg(struct sock *sk);
 
-
-/**********************
- ** linux/mm-types.h **
- **********************/
-
-struct page_frag
+struct cg_proto
 {
-	struct page *page;
-	__u16        offset;
-	__u16        size;
+	struct page_counter memory_allocated;
+	struct percpu_counter sockets_allocated;
+	int memory_pressure;
+	long sysctl_mem[3];
 };
 
 
@@ -4214,6 +4621,10 @@ signed long schedule_timeout(signed long timeout);
 bool need_resched(void);
 int cond_resched(void);
 int cond_resched_softirq(void);
+
+u64 local_clock(void);
+
+int fatal_signal_pending(struct task_struct *p);
 
 
 /************************
@@ -4274,6 +4685,7 @@ struct inet6_dev;
  *********************/
 
 enum {
+	IPPROTO_IP  = 0,
 	IPPROTO_TCP = 6,
 	IPPROTO_UDP = 17,
 	IPPROTO_AH  = 51,
@@ -4382,9 +4794,12 @@ struct frag_hdr
 __sum16 tcp_v4_check(int len, __be32 saddr, __be32 daddr, __wsum base);
 
 
+
 /**********************
  ** uapi/linux/tcp.h **
  **********************/
+
+enum { TCP_CA_NAME_MAX = 16 };
 
 struct tcphdr
 {
@@ -4409,12 +4824,21 @@ struct tcphdr
 
 struct tcphdr *tcp_hdr(const struct sk_buff *skb);
 
+char *tcp_ca_get_name_by_key(u32 key, char *buffer);
+
 
 /*****************
  ** linux/tcp.h **
  *****************/
 
+struct tcp_sock
+{
+	u32 snd_una;
+};
+
 unsigned int tcp_hdrlen(const struct sk_buff *skb);
+static inline struct tcp_sock *tcp_sk(const struct sock *sk) {
+	return (struct tcp_sock *)sk; }
 
 
 /**********************
@@ -4453,6 +4877,8 @@ for ((cpu) = 0; (cpu) < 1; (cpu)++, (void)mask)
 
 #define for_each_possible_cpu(cpu) for_each_cpu((cpu), cpu_possible_mask)
 #define hotcpu_notifier(fn, pri)
+
+#define num_possible_cpus() 1U
 
 
 /************************
@@ -4563,6 +4989,15 @@ struct sock_filter {    /* Filter block */
 };
 
 
+/**********************
+ ** uapi/linux/bpf.h **
+ **********************/
+
+enum bpf_prog_type {
+	BPF_PROG_TYPE_SOCKET_FILTER,
+};
+
+
 /********************
  ** linux/filter.h **
  ********************/
@@ -4570,13 +5005,22 @@ struct sock_filter {    /* Filter block */
 struct sk_buff;
 struct sock_filter;
 struct sock_fprog;
+
+struct bpf_prog
+{
+	u32                len;
+	enum bpf_prog_type type;
+
+	union {
+		struct sock_filter      insns[0];
+	};
+};
+
 struct sk_filter
 {
 	atomic_t        refcnt;
-	unsigned int    len;
 	struct rcu_head rcu;
-
-	struct sock_filter      insns[0];
+	struct bpf_prog *prog;
 };
 
 unsigned int sk_filter_size(unsigned int proglen);
@@ -4590,6 +5034,25 @@ int sk_get_filter(struct sock *, struct sock_filter *, unsigned);
 #define SK_RUN_FILTER(FILTER, SKB) sk_run_filter(SKB, FILTER->insns)
 
 int bpf_tell_extensions(void);
+
+typedef int (*bpf_aux_classic_check_t)(struct sock_filter *filter,
+                                       unsigned int flen);
+
+int bpf_prog_create_from_user(struct bpf_prog **pfp, struct sock_fprog *fprog,
+                              bpf_aux_classic_check_t trans, bool save_orig);
+void bpf_prog_destroy(struct bpf_prog *fp);
+u32 bpf_prog_run_clear_cb(const struct bpf_prog *prog, struct sk_buff *skb);
+
+
+
+/*****************
+ ** linux/bpf.h **
+ *****************/
+
+
+static inline struct bpf_prog *bpf_prog_get(u32 ufd) {
+	return (struct bpf_prog*)ERR_PTR(-EOPNOTSUPP); }
+static inline void bpf_prog_put(struct bpf_prog *prog) { }
 
 
 /**************************
@@ -4674,6 +5137,17 @@ static inline unsigned long __copy_from_user_nocache(void *to, const void __user
 
 struct scatterlist
 {
+	/*
+	 * We use a dummy struct page member because there is
+	 * none for abitrary addresses that were not allocated
+	 * with alloc_page() and save the buf pointer given in
+	 * sg_set_buf directly to page_dummy.addr and hope for
+	 * the best. This dummy is then stored in page_link.
+	 * The offset is always 0.
+	 */
+	struct page  page_dummy;
+	unsigned int page_flags;
+
 	unsigned long page_link;
 	unsigned int  offset;
 	unsigned int  length;
@@ -4686,23 +5160,26 @@ struct scatterlist *sg_next(struct scatterlist *);
 void sg_init_table(struct scatterlist *, unsigned int);
 void sg_init_one(struct scatterlist *, const void *, unsigned int);
 
-#define sg_is_last(sg)   ((sg)->page_link & 0x02)
-#define sg_chain_ptr(sg) ((struct scatterlist *) ((sg)->page_link & ~0x03))
+#define sg_is_chain(sg)  ((sg)->page_flags & 0x01)
+#define sg_is_last(sg)   ((sg)->page_flags & 0x02)
+#define sg_chain_ptr(sg) ((struct scatterlist *) ((sg)->page_link))
 
 static inline struct page *sg_page(struct scatterlist *sg) {
-	return (struct page *)((sg)->page_link & ~0x3); }
+	return (struct page *)((sg)->page_link); }
+
+void sg_chain(struct scatterlist *prv, unsigned int prv_nents, struct scatterlist *sgl);
 
 
 /**************
  ** net/ip.h **
  **************/
 
-enum { IP_DEFRAG_AF_PACKET }; /* XXX original value is not 0 */
+enum { IP_DEFRAG_AF_PACKET = 42, };
 
 struct inet_skb_parm { unsigned unused; };
 
 unsigned int ip_hdrlen(const struct sk_buff *skb);
-struct sk_buff *ip_check_defrag(struct sk_buff *skb, u32 user);
+struct sk_buff *ip_check_defrag(struct net *net, struct sk_buff *skb, u32 user);
 
 
 /********************
@@ -4748,6 +5225,8 @@ __wsum csum_partial_ext(const void *buff, int len, __wsum sum);
 __wsum csum_block_add_ext(__wsum csum, __wsum csum2, int offset, int len);
 
 void csum_replace2(__sum16 *, __be16, __be16);
+
+__wsum remcsum_adjust(void *ptr, __wsum csum, int start, int offset);
 
 
 /************************
@@ -4816,46 +5295,6 @@ typedef void (*smp_call_func_t)(void *info);
 int on_each_cpu(smp_call_func_t, void *, int);
 
 
-/****************************
- ** uapi/linux/genetlink.h **
- ****************************/
-
-/* #define GENL_NAMSIZ      16 */
-/* #define GENL_ID_GENERATE 0 */
-/* #define GENL_ADMIN_PERM  0x01 */
-
-/* struct genlmsghdr { */
-/* 	u8 cmd; */
-/* 	u8 version; */
-/* 	u16 reserved; */
-/* }; */
-
-/* #define GENL_HDRLEN   NLMSG_ALIGN(sizeof(struct genlmsghdr)) */
-
-/* */
-/* struct nlattr { */
-/* 	u16 nla_len; */
-/* 	u16 nla_type; */
-/* }; */
-/* */
-
-/* #define NLM_F_MULTI             2 */
-
-/* */
-/* struct nlmsghdr { */
-/* 	u32       nlmsg_len; */
-/* 	u16       nlmsg_type; */
-/* 	u16       nlmsg_flags; */
-/* 	u32       nlmsg_seq; */
-/* 	u32       nlmsg_pid; */
-/* }; */
-/* */
-
-/* #define NLMSG_HDRLEN     ((int) NLMSG_ALIGN(sizeof(struct nlmsghdr))) */
-
-/* #define NLMSG_ALIGNTO   4U */
-/* #define NLMSG_ALIGN(len) ( ((len)+NLMSG_ALIGNTO-1) & ~(NLMSG_ALIGNTO-1) ) */
-
 /**************************
  ** uapi/linux/netlink.h **
  **************************/
@@ -4864,107 +5303,12 @@ int on_each_cpu(smp_call_func_t, void *, int);
 #define NLA_ALIGN(len)      (((len) + NLA_ALIGNTO - 1) & ~(NLA_ALIGNTO - 1))
 
 
-/*******************
- ** net/netlink.h **
- *******************/
-
-/*
-enum {
-	NLA_U8,
-	NLA_U16,
-	NLA_U32,
-	NLA_U64,
-	NLA_STRING,
-	NLA_FLAG,
-	NLA_NESTED,
-	NLA_NUL_STRING,
-	NLA_BINARY,
-};
-
-struct nla_policy {
-	u16 type;
-	u16 len;
-};
-
-
-static inline int nla_ok(const struct nlattr *nla, int remaining)
-{
-	return remaining >= (int) sizeof(*nla) &&
-	       nla->nla_len >= sizeof(*nla) &&
-	       nla->nla_len <= remaining;
-}
-
-static inline struct nlattr *nla_next(const struct nlattr *nla, int *remaining)
-{
-	int totlen = NLA_ALIGN(nla->nla_len);
-	*remaining -= totlen;
-	return (struct nlattr *) ((char *) nla + totlen);
-}
-
-#define nla_for_each_attr(pos, head, len, rem) \
-	for (pos = head, rem = len; \
-	nla_ok(pos, rem); \
-	pos = nla_next(pos, &(rem)))
-
-#define nla_for_each_nested(pos, nla, rem) \
-	nla_for_each_attr(pos, nla_data(nla), nla_len(nla), rem)
-*/
-
-
 /***********************
  ** linux/genetlink.h **
  ***********************/
 
-/* struct genl_info { */
-/* 	u32 snd_seq; */
-/* 	u32 snd_portid; */
-/* 	struct genlmsghdr *genlhdr; */
-/* 	struct nlattr **attrs; */
-/* 	void *user_ptr[2]; */
-/* }; */
-
-/* struct netlink_callback; */
-
-/* struct genl_ops { */
-/* 	u8          cmd; */
-/* 	u8          internal_flags; */
-/* 	unsigned int        flags; */
-/* 	const struct nla_policy *policy; */
-/* 	int            (*doit)(struct sk_buff *skb, */
-/* 			struct genl_info *info); */
-/* 	int            (*dumpit)(struct sk_buff *skb, */
-/* 			struct netlink_callback *cb); */
-/* 	int            (*done)(struct netlink_callback *cb); */
-/* 	struct list_head    ops_list; */
-/* }; */
-
-/* struct genl_multicast_group { */
-/* 	char name[GENL_NAMSIZ]; */
-/* 	u32 id; */
-/* }; */
-
-/* struct genl_family { */
-/* 	unsigned int        id; */
-/* 	unsigned int        hdrsize; */
-/* 	char            name[GENL_NAMSIZ]; */
-/* 	unsigned int        version; */
-/* 	unsigned int        maxattr; */
-/* 	bool            netnsok; */
-/* 	int         (*pre_doit)(struct genl_ops *ops, */
-/* 	                        struct sk_buff *skb, */
-/* 	                        struct genl_info *info); */
-/* 	void            (*post_doit)(struct genl_ops *ops, */
-/* 	                             struct sk_buff *skb, */
-/* 	                             struct genl_info *info); */
-/* 	struct nlattr **    attrbuf;    /1* private *1/ */
-/* 	struct list_head    ops_list;   /1* private *1/ */
-/* 	struct list_head    family_list;    /1* private *1/ */
-/* 	struct list_head    mcast_groups;   /1* private *1/ */
-/* }; */
-
 #define MODULE_ALIAS_GENL_FAMILY(family) \
 	MODULE_ALIAS_NET_PF_PROTO_NAME(PF_NETLINK, NETLINK_GENERIC, "-family-" family)
-
 
 
 /*****************************
@@ -4977,8 +5321,10 @@ enum {
 	SOF_TIMESTAMPING_RX_HARDWARE  = 1 << 2,
 	SOF_TIMESTAMPING_RX_SOFTWARE  = 1 << 3,
 	SOF_TIMESTAMPING_SOFTWARE     = 1 << 4,
-	SOF_TIMESTAMPING_SYS_HARDWARE =  1 << 5,
-	SOF_TIMESTAMPING_RAW_HARDWARE =  1 << 6,
+	SOF_TIMESTAMPING_SYS_HARDWARE = 1 << 5,
+	SOF_TIMESTAMPING_RAW_HARDWARE = 1 << 6,
+	SOF_TIMESTAMPING_OPT_ID       = 1 << 7,
+	SOF_TIMESTAMPING_OPT_TSONLY   = 1 << 11,
 	SOF_TIMESTAMPING_MASK = (SOF_TIMESTAMPING_RAW_HARDWARE - 1) |
 	                         SOF_TIMESTAMPING_RAW_HARDWARE,
 };
@@ -5038,6 +5384,13 @@ void * krealloc(void *, size_t, gfp_t);
  ** net/flow_keys.h **
  *********************/
 
+struct flow_dissector_key_control
+{
+	u16 thoff;
+	u16 addr_type;
+	u32 flags;
+};
+
 struct flow_keys
 {
 	/* (src,dst) must be grouped, in the same way than in IP header */
@@ -5049,10 +5402,54 @@ struct flow_keys
 	};
 	u16 thoff;
 	u8 ip_proto;
+
+	struct flow_dissector_key_control control;
 };
 
-bool skb_flow_dissect(const struct sk_buff *skb, struct flow_keys *flow);
-__be32 skb_flow_get_ports(const struct sk_buff *skb, int thoff, u8 ip_proto);
+struct flow_dissector_key
+{
+	unsigned dummy;
+};
+
+struct flow_dissector
+{
+	unsigned dummy;
+};
+
+extern struct flow_dissector flow_keys_dissector;
+extern struct flow_dissector flow_keys_buf_dissector;
+
+bool flow_keys_have_l4(struct flow_keys *keys);
+
+
+/****************
+ ** net/flow.h **
+ ****************/
+
+enum {
+	FLOWI_FLAG_ANYSRC = 0x01,
+};
+
+struct flowi4
+{
+	unsigned dummy;
+};
+
+struct flowi6
+{
+	unsigned dummy;
+};
+
+struct flowi
+{
+	union {
+		struct flowi4 ip4;
+		struct flowi6 ip6;
+	} u;
+};
+
+__u32 __get_hash_from_flowi4(const struct flowi4 *fl4, struct flow_keys *keys);
+__u32 __get_hash_from_flowi6(const struct flowi6 *fl6, struct flow_keys *keys);
 
 
 /***********************
@@ -5069,7 +5466,29 @@ extern const struct pipe_buf_operations nosteal_pipe_buf_ops;
 #define ACPI_PTR(_ptr)   (NULL)
 #define ACPI_HANDLE(dev) (NULL)
 
+struct acpi_device;
+
 const struct acpi_device_id *acpi_match_device(const struct acpi_device_id *ids, const struct device *dev);
+
+struct acpi_gpio_params {
+	unsigned int crs_entry_index;
+	unsigned int line_index;
+	bool active_low;
+};
+
+struct acpi_gpio_mapping {
+	const char *name;
+	const struct acpi_gpio_params *data;
+	unsigned int size;
+};
+
+static inline int acpi_dev_add_driver_gpios(struct acpi_device *adev,
+                                           const struct acpi_gpio_mapping *gpios)
+{
+	return -ENXIO;
+}
+
+static inline void acpi_dev_remove_driver_gpios(struct acpi_device *adev) {}
 
 
 /********************
@@ -5086,8 +5505,17 @@ static inline void get_random_bytes(void *buf, int nbytes)
 		b[i] = i + 1;
 }
 
-u32 prandom_u32(void);
+static inline u32 prandom_u32(void)
+{
+	return 4; // fair dice roll
+}
+
 static inline u32 prandom_u32_max(u32 ep_ro) { return (u32)(((u64) prandom_u32() * ep_ro) >> 32); }
+
+static inline void prandom_bytes(void *buf, size_t nbytes)
+{
+	get_random_bytes(buf, nbytes);
+}
 
 
 /*********************
@@ -5150,6 +5578,8 @@ static inline void bitmap_zero(unsigned long *dst, int nbits)
 void bitmap_fill(unsigned long *dst, int nbits);
 int bitmap_empty(const unsigned long *src, int nbits);
 
+#define BITMAP_LAST_WORD_MASK(nbits) (~0UL >> (-(nbits) & (BITS_PER_LONG - 1)))
+
 
 /*******************************
  ** uapi/asm-generic/ioctls.h **
@@ -5200,6 +5630,7 @@ void synchronize_irq(unsigned int irq);
  **************************/
 
 void udelay(unsigned long usecs);
+void mdelay(unsigned long msecs);
 
 
 /****************************
@@ -5276,7 +5707,7 @@ bool sk_busy_loop(struct sock *sk, int nonblock);
 static inline void secpath_reset(struct sk_buff *skb) { }
 int __xfrm_sk_clone_policy(struct sock *sk);
 void xfrm_sk_free_policy(struct sock *sk);
-int xfrm_sk_clone_policy(struct sock *sk);
+int xfrm_sk_clone_policy(struct sock *sk, const struct sock *osk);
 
 
 /*************************
@@ -5382,5 +5813,189 @@ void *kthread_run(int (*threadfn)(void *), void *data, char const *name);
  *****************/
 
 int alg_test(const char *driver, const char *alg, u32 type, u32 mask);
+
+enum { fips_enabled = 0 };
+
+
+/*********************
+ ** net/switchdev.h **
+ *********************/
+
+enum switchdev_attr_id {
+	SWITCHDEV_ATTR_ID_UNDEFINED,
+	SWITCHDEV_ATTR_ID_PORT_PARENT_ID,
+};
+
+struct switchdev_attr
+{
+	enum switchdev_attr_id id;
+	u32 flags;
+	union {
+		struct netdev_phys_item_id ppid; /* PORT_PARENT_ID */
+		u8 stp_state;                    /* PORT_STP_STATE */
+		unsigned long brport_flags;      /* PORT_BRIDGE_FLAGS */
+		u32 ageing_time;                 /* BRIDGE_AGEING_TIME */
+	} u;
+
+};
+
+int switchdev_port_attr_get(struct net_device *dev, struct switchdev_attr *attr);
+
+#define SWITCHDEV_F_NO_RECURSE BIT(0)
+
+
+/************************************
+ ** uapi/linux/input-event-codes.h **
+ ************************************/
+
+enum {
+	EV_KEY = 0x01,
+	EV_SW  = 0x05,
+
+	SW_RFKILL_ALL = 0x03,
+
+	KEY_BLUETOOTH = 237,
+	KEY_WLAN      = 238,
+	KEY_UWB       = 239,
+	KEY_WIMAX     = 246,
+	KEY_RFKILL    = 247,
+};
+
+
+/*********************
+ ** gpio/consumer.h **
+ *********************/
+
+enum gpiod_flags {
+	GPIOD_FLAGS_BIT_DIR_SET = 1 << 0,
+	GPIOD_FLAGS_BIT_DIR_OUT = 1 << 1,
+	GPIOD_OUT_LOW = GPIOD_FLAGS_BIT_DIR_SET | GPIOD_FLAGS_BIT_DIR_OUT,
+};
+
+/*******************
+ ** linux/input.h **
+ *******************/
+
+struct input_dev
+{
+	unsigned long evbit;//[BITS_TO_LONGS(EV_CNT)];
+	unsigned long swbit;//[BITS_TO_LONGS(SW_CNT)];
+	unsigned long sw;//[BITS_TO_LONGS(SW_CNT)];
+
+	spinlock_t event_lock;
+};
+
+struct input_handle;
+struct input_device_id;
+
+struct input_handler
+{
+	void (*event)(struct input_handle *handle, unsigned int type, unsigned int code, int value);
+	int (*connect)(struct input_handler *handler, struct input_dev *dev, const struct input_device_id *id);
+	void (*disconnect)(struct input_handle *handle);
+	void (*start)(struct input_handle *handle);
+
+	const char *name;
+	const struct input_device_id *id_table;
+};
+
+struct input_handle
+{
+	const char *name;
+
+	struct input_dev *dev;
+	struct input_handler *handler;
+};
+
+/***********************
+ ** uapi/linux/mlps.h **
+ ***********************/
+
+enum {
+	MPLS_LS_TC_MASK  = 0x00000E00,
+	MPLS_LS_TC_SHIFT = 9u,
+};
+
+struct mpls_label
+{
+	__be32 entry;
+};
+
+
+/*************************
+ ** linux/devcoredump.h **
+ *************************/
+
+static inline void dev_coredumpm(struct device *dev, struct module *owner,
+                                 const void *data, size_t datalen, gfp_t gfp,
+                                 ssize_t (*read)(char *buffer, loff_t offset,
+                                 size_t count, const void *data, size_t datalen),
+                                 void (*free)(const void *data))
+{
+	free(data);
+}
+
+
+/*************************
+ ** linux/timekeeping.h **
+ *************************/
+
+typedef __s64 time64_t;
+
+time64_t ktime_get_seconds(void);
+
+
+/***********************************
+ ** uapi/linux/virtio_types.h:42: **
+ ***********************************/
+
+typedef __u16 __virtio16;
+
+
+/*******************************
+ ** linux/virtio_byteorder.h **
+ *******************************/
+
+static inline bool virtio_legacy_is_little_endian(void) { return true; }
+
+static inline u16 __virtio16_to_cpu(bool little_endian, __virtio16 val)
+{
+	if (little_endian) return le16_to_cpu((__le16)val);
+	else               return be16_to_cpu((__be16)val);
+}
+
+static inline __virtio16 __cpu_to_virtio16(bool little_endian, u16 val)
+{
+	if (little_endian) return (__virtio16)cpu_to_le16(val);
+	else               return (__virtio16)cpu_to_be16(val);
+}
+
+
+/********************
+ ** linux/mmzone.h **
+ ********************/
+
+enum { PAGE_ALLOC_COSTLY_ORDER = 3u };
+
+
+/****************************
+ ** linux/u64_stats_sync.h **
+ ****************************/
+
+struct u64_stats_sync;
+
+static inline void u64_stats_update_begin(struct u64_stats_sync *p) { }
+
+static inline void u64_stats_update_end(struct u64_stats_sync *p) { }
+
+static inline unsigned int u64_stats_fetch_begin_irq(const struct u64_stats_sync *p)
+{
+	return 0;
+}
+
+static inline bool u64_stats_fetch_retry_irq(const struct u64_stats_sync *p, unsigned int s)
+{
+	return false;
+}
 
 #endif /* _LX_EMUL_H_ */

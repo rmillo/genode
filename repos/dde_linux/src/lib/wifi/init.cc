@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (C) 2014 Genode Labs GmbH
+ * Copyright (C) 2014-2016 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
@@ -48,40 +48,41 @@ LIST_HEAD(net_namespace_list);
 
 
 Firmware_list fw_list[] = {
-	{ "iwlwifi-1000-3.ucode", 335056 },
-	{ "iwlwifi-1000-5.ucode", 337520 },
-	{ "iwlwifi-105-6.ucode", 689680 },
-	{ "iwlwifi-135-6.ucode", 701228 },
-	{ "iwlwifi-2000-6.ucode", 695876 },
-	{ "iwlwifi-2030-6.ucode", 707392 },
-	{ "iwlwifi-3160-7.ucode", 670484 },
-	{ "iwlwifi-3160-8.ucode", 667284 },
-	{ "iwlwifi-3160-9.ucode", 666792 },
-	{ "iwlwifi-3945-2.ucode", 150100 },
-	{ "iwlwifi-4965-2.ucode", 187972 },
-	{ "iwlwifi-5000-1.ucode", 345008 },
-	{ "iwlwifi-5000-2.ucode", 353240 },
-	{ "iwlwifi-5000-5.ucode", 340696 },
-	{ "iwlwifi-5150-2.ucode", 337400 },
-	{ "iwlwifi-6000-4.ucode", 454608 },
+	{ "iwlwifi-1000-3.ucode", 335056, nullptr },
+	{ "iwlwifi-1000-5.ucode", 337520, nullptr },
+	{ "iwlwifi-105-6.ucode",  689680, nullptr },
+	{ "iwlwifi-135-6.ucode",  701228, nullptr },
+	{ "iwlwifi-2000-6.ucode", 695876, nullptr },
+	{ "iwlwifi-2030-6.ucode", 707392, nullptr },
+	{ "iwlwifi-3160-7.ucode", 670484, nullptr },
+	{ "iwlwifi-3160-8.ucode", 667284, nullptr },
+	{ "iwlwifi-3160-9.ucode", 666792, nullptr },
+	{ "iwlwifi-3945-2.ucode", 150100, nullptr },
+	{ "iwlwifi-4965-2.ucode", 187972, nullptr },
+	{ "iwlwifi-5000-1.ucode", 345008, nullptr },
+	{ "iwlwifi-5000-2.ucode", 353240, nullptr },
+	{ "iwlwifi-5000-5.ucode", 340696, nullptr },
+	{ "iwlwifi-5150-2.ucode", 337400, nullptr },
+	{ "iwlwifi-6000-4.ucode", 454608, nullptr },
 	/**
 	 * Actually, there is no -6 firmware. The last one is revision 4,
 	 * but certain devices support up to revision 6 and want to use
-	 * this one. Our fw loading mechanism sadly will not work in this
-	 * case, therefore we add -6 to the fw whitelist have to provide
-	 * a renamed image.
+	 * this one. To make things simple we refer to the available
+	 * firmware under the requested name.
 	 */
-	{ "iwlwifi-6000-6.ucode", 454608 }, /* XXX same as -4 */
-	{ "iwlwifi-6000g2a-5.ucode", 444128 },
-	{ "iwlwifi-6000g2a-6.ucode", 677296 },
-	{ "iwlwifi-6000g2b-5.ucode", 460236 },
-	{ "iwlwifi-6000g2b-6.ucode", 679436 },
-	{ "iwlwifi-6050-4.ucode", 463692 },
-	{ "iwlwifi-6050-5.ucode", 469780 },
-	{ "iwlwifi-7260-7.ucode", 683236 },
-	{ "iwlwifi-7260-8.ucode", 679780 },
-	{ "iwlwifi-7260-9.ucode", 679380 },
-	{ "iwlwifi-7265-8.ucode", 690452 }
+	{ "iwlwifi-6000-6.ucode",     454608, "iwlwifi-6000-4.ucode" },
+	{ "iwlwifi-6000g2a-5.ucode",  444128, nullptr },
+	{ "iwlwifi-6000g2a-6.ucode",  677296, nullptr },
+	{ "iwlwifi-6000g2b-5.ucode",  460236, nullptr },
+	{ "iwlwifi-6000g2b-6.ucode",  679436, nullptr },
+	{ "iwlwifi-6050-4.ucode",     463692, nullptr },
+	{ "iwlwifi-6050-5.ucode",     469780, nullptr },
+	{ "iwlwifi-7260-16.ucode",   1049284, nullptr },
+	{ "iwlwifi-7260-17.ucode",   1049284, "iwlwifi-7260-16.ucode" },
+	{ "iwlwifi-7265-16.ucode",   1180356, nullptr },
+	{ "iwlwifi-7265D-16.ucode",  1384500, nullptr },
+	{ "iwlwifi-8000C-16.ucode",  2351636, nullptr },
+	{ "iwlwifi-8000C-19.ucode",  2351636, "iwlwifi-8000C-16.ucode" }
 };
 
 
@@ -107,7 +108,7 @@ static void run_linux(void *)
 	module_aes_init();
 	module_arc4_init();
 	module_chainiv_module_init();
-	module_krng_mod_init();
+	// module_krng_mod_init();
 
 	if (!mac80211_only) {
 		module_iwl_drv_init();
