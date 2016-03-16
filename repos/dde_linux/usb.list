@@ -28,6 +28,7 @@ linux-4.4.3/drivers/scsi/constants.c
 linux-4.4.3/drivers/scsi/scsi_logging.h
 linux-4.4.3/drivers/scsi/scsi.c
 linux-4.4.3/drivers/scsi/scsi_priv.h
+linux-4.4.3/drivers/usb/common/common.c
 linux-4.4.3/drivers/usb/core/buffer.c
 linux-4.4.3/drivers/usb/core/config.c
 linux-4.4.3/drivers/usb/core/devices.c

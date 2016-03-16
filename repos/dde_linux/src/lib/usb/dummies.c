@@ -32,6 +32,12 @@
 #define SKIP
 #endif
 
+/******************
+ ** linux/slab.h **
+ ******************/
+
+void *kmalloc_array(size_t n, size_t size, gfp_t flags) { TRACE; return (void *)0xdeadbeaf; }
+
 
 /******************
  ** asm/atomic.h **
@@ -173,6 +179,7 @@ ktime_t ktime_add_ns(const ktime_t kt, u64 nsec) { KTIME_RET; }
 ktime_t ktime_get_monotonic_offset(void) { KTIME_RET; }
 ktime_t ktime_sub(const ktime_t lhs, const ktime_t rhs) { KTIME_RET; }
 ktime_t ktime_get_real(void) { TRACE; ktime_t ret; return ret; }
+ktime_t ktime_get_boottime(void) { TRACE; KTIME_RET; }
 
 struct timeval ktime_to_timeval(const ktime_t kt) { TRACE; struct timeval ret;  return ret; }
 
@@ -187,9 +194,30 @@ unsigned long round_jiffies(unsigned long j) { TRACE; return 1; }
 void set_timer_slack(struct timer_list *time, int slack_hz) { TRACE; }
 
 
+/*******************
+ ** linux/delay.h **
+ *******************/
+
+void usleep_range(unsigned long min, unsigned long max) { TRACE; }
+
 /***********************
  ** linux/workquque.h **
  ***********************/
+
+//XXX: do right
+struct workqueue_struct dummy;
+struct workqueue_struct *system_power_efficient_wq = &dummy;
+
+struct workqueue_struct *alloc_workqueue(const char *fmt, unsigned int flags,
+                                         int max_active, ...)
+{
+	TRACE;
+	return 0;
+}
+
+void destroy_workqueue(struct workqueue_struct *wq) { TRACE; }
+
+bool queue_work(struct workqueue_struct *wq, struct work_struct *work) { TRACE; return false; }
 
 bool cancel_work_sync(struct work_struct *work) { TRACE; return 0; }
 int cancel_delayed_work_sync(struct delayed_work *work) { TRACE; return 0; }
@@ -280,6 +308,7 @@ ssize_t simple_read_from_buffer(void __user *to, size_t count,
  ** linux/pm_runtime.h **
  ************************/
 
+bool pm_runtime_active(struct device *dev) { TRACE; return false; }
 int  pm_runtime_set_active(struct device *dev) { TRACE; return 0; }
 void pm_suspend_ignore_children(struct device *dev, bool enable) { TRACE; }
 void pm_runtime_enable(struct device *dev) { TRACE; }
@@ -296,6 +325,7 @@ void pm_runtime_set_autosuspend_delay(struct device *dev, int delay) { TRACE; }
 int  pm_runtime_get_sync(struct device *dev) { TRACE; return 0; }
 int  pm_runtime_put_sync(struct device *dev) { TRACE; return 0; }
 int  pm_runtime_put(struct device *dev) { TRACE; return 0; }
+int  pm_runtime_barrier(struct device *dev) { TRACE; return 0; }
 
 
 /***********************
@@ -314,6 +344,9 @@ bool device_can_wakeup(struct device *dev) { TRACE; return 0; }
  ********************/
 
 int dev_pm_qos_expose_flags(struct device *dev, s32 value) { TRACE; return 0; }
+int dev_pm_qos_add_request(struct device *dev, struct dev_pm_qos_request *req,
+                           enum dev_pm_qos_req_type type, s32 value) { TRACE; return 0; }
+int dev_pm_qos_remove_request(struct dev_pm_qos_request *req) { TRACE; return 0; }
 
 
 /********************
@@ -373,6 +406,8 @@ int  bus_register_notifier(struct bus_type *bus,
                            struct notifier_block *nb) { TRACE; return 0; }
 int  bus_unregister_notifier(struct bus_type *bus,
                              struct notifier_block *nb) { TRACE; return 0; }
+int  bus_for_each_dev(struct bus_type *bus, struct device *start, void *data,
+                      int (*fn)(struct device *dev, void *data)) { TRACE; return 0; }
 
 struct class *__class_create(struct module *owner,
                              const char *name,
@@ -530,6 +565,7 @@ bool is_highmem(void *ptr) { TRACE; return 0; }
 
 struct zone *page_zone(const struct page *page) { TRACE; return NULL; }
 int    is_vmalloc_addr(const void *x) { TRACE; return 0; }
+void   kvfree(const void *addr) { TRACE; }
 
 
 /**********************
@@ -672,6 +708,12 @@ void dma_unmap_page(struct device *dev, dma_addr_t dma_address, size_t size,
 
 int dma_mapping_error(struct device *dev, dma_addr_t dma_addr) { SKIP; return 0; }
 
+
+/*********************
+ ** linux/uaccess.h **
+ *********************/
+
+unsigned long clear_user(void *to, unsigned long n) { TRACE; return 0; }
 
 /*****************
  ** linux/pid.h **
@@ -907,6 +949,15 @@ int generic_mii_ioctl(struct mii_if_info *mii_if,
 struct mii_ioctl_data *if_mii(struct ifreq *rq) { TRACE; return 0; }
 
 
+/***********************
+ ** uapi/linux/mdio.h **
+ ***********************/
+
+u16 ethtool_adv_to_mmd_eee_adv_t(u32 adv) { TRACE; return 0; }
+u32 mmd_eee_adv_to_ethtool_adv_t(u16 eee_adv) { TRACE; return 0; }
+u32 mmd_eee_cap_to_ethtool_sup_t(u16 eee_cap) { TRACE; return 0; }
+
+
 /*************************
  ** linux/etherdevice.h **
  *************************/
@@ -960,6 +1011,8 @@ void   clk_disable_unprepare(struct clk *clk) { TRACE; }
 
 int bitmap_subset(const unsigned long *src1,
                   const unsigned long *src2, int nbits) { TRACE; return 1; }
+
+int bitmap_weight(const unsigned long *src, unsigned int nbits) { TRACE; return 0; }
 
 
 /*****************

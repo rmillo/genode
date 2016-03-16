@@ -76,7 +76,8 @@ static void init(Services *services)
 		module_ch_driver_init();
 		module_ms_driver_init();
 		module_mt_driver_init();
-		module_wacom_driver_init();
+		/* XXX: @alexab uncomment */
+		//module_wacom_driver_init();
 	}
 
 	/* host controller */

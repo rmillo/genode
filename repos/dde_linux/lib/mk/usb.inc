@@ -46,6 +46,9 @@ SRC_C += $(addprefix usb/core/,$(notdir $(wildcard $(USB_DIR)/core/*.c)))
 # USB host-controller driver
 SRC_C += $(addprefix usb/host/, ehci-hcd.c)
 
+# common
+SRC_C += usb/common/common.c
+
 # USB hid
 SRC_C += $(addprefix hid/usbhid/, hid-core.c hid-quirks.c)
 SRC_C += $(addprefix hid/,        hid-core.c hid-generic.c hid-input.c \

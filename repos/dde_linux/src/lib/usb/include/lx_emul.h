@@ -1275,7 +1275,6 @@ struct workqueue_struct { unsigned dummy; };
 
 extern struct workqueue_struct *system_power_efficient_wq;
 
-
 bool queue_delayed_work(struct workqueue_struct *,
                         struct delayed_work *, unsigned long);
 bool cancel_delayed_work(struct delayed_work *);
@@ -3946,6 +3945,13 @@ struct usb_gadget { };
 
 bool of_property_read_bool(const struct device_node *np, const char *propname);
 
+
+/**********************
+ ** linux/property.h **
+ **********************/
+
+int device_property_read_string(struct device *dev, const char *propname,
+                                const char **val);
 
 /************************
  ** linux/radix-tree.h **
