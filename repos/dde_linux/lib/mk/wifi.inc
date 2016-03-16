@@ -15,10 +15,13 @@ LIBS  += wifi_include libc-setjmp libc
 
 LD_OPT += --version-script=$(LIB_DIR)/symbol.map
 
-SRC_CC += dummies.cc init.cc lxcc_emul.cc pci_driver.cc timer.cc irq.cc \
-          work.cc nic.cc socket_call.cc scheduler.cc event.cc
+SRC_CC += dummies.cc init.cc lxcc_emul.cc nic.cc socket_call.cc
 
-SRC_C += lxc_emul.c socket.c
+# lx_kit
+SRC_CC += mapped_io_mem_range.cc irq.cc pci.cc malloc.cc scheduler.cc \
+          work.cc timer.cc
+
+SRC_C += lxc_emul.c
 
 CC_WARN  =
 CC_OPT  += -fno-builtin-toupper
@@ -111,6 +114,6 @@ vpath %.c  $(WIFI_DIR)
 vpath %.c  $(WIFI_CONTRIB_DIR)
 vpath %.c  $(LIB_DIR)
 vpath %.cc $(LIB_DIR)
-vpath %.cc $(LIB_DIR)/signal
+vpath %.cc $(REP_DIR)/src/lx_kit
 
 # vi: set ft=make :

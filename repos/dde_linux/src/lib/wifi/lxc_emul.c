@@ -11,11 +11,13 @@
  * under the terms of the GNU General Public License version 2.
  */
 
+/* linux includes */
 #include <asm-generic/atomic64.h>
 #include <linux/netdevice.h>
 #include <net/sock.h>
 #include <linux/skbuff.h>
 
+/* local includes */
 #include <lxc.h>
 
 
@@ -281,7 +283,7 @@ struct scatterlist *sg_next(struct scatterlist *sg)
 void sg_set_buf(struct scatterlist *sg, const void *buf, unsigned int buflen)
 {
 	struct page *page   = &sg->page_dummy;
-	sg->page_dummy.addr = buf;
+	sg->page_dummy.addr = (void*)buf;
 	sg_set_page(sg, page, buflen, 0);
 }
 
@@ -292,3 +294,96 @@ void sg_set_page(struct scatterlist *sg, struct page *page, unsigned int len, un
 	sg->offset    = offset;
 	sg->length    = len;
 }
+
+
+/****************
+ ** net/sock.h **
+ ****************/
+
+static const struct net_proto_family *net_families[NPROTO];
+
+int sock_register(const struct net_proto_family *ops)
+{
+	if (ops->family >= NPROTO) {
+		printk("protocol %d >=  NPROTO (%d)\n", ops->family, NPROTO);
+		return -ENOBUFS;
+	}
+
+	net_families[ops->family] = ops;
+	pr_info("NET: Registered protocol family %d\n", ops->family);
+	return 0;
+}
+
+
+struct socket *sock_alloc(void)
+{
+	return (struct socket *)kmalloc(sizeof(struct socket), 0);
+}
+
+
+int sock_create_lite(int family, int type, int protocol, struct socket **res)
+
+{
+	struct socket *sock = sock_alloc();
+
+	if (!sock) return -ENOMEM;
+
+	sock->type = type;
+	*res = sock;
+	return 0;
+}
+
+
+int sock_create_kern(struct net *net, int family, int type, int proto,
+                     struct socket **res)
+{
+	struct socket *sock;
+	const struct net_proto_family *pf;
+	int err;
+
+	if (family < 0 || family > NPROTO)
+		return -EAFNOSUPPORT;
+
+	if (type < 0 || type > SOCK_MAX)
+		return -EINVAL;
+
+	pf = net_families[family];
+
+	if (!pf) {
+		printk("No protocol found for family %d\n", family);
+		return -ENOPROTOOPT;
+	}
+
+	if (!(sock = (struct socket *)kzalloc(sizeof(struct socket), 0))) {
+		printk("Could not allocate socket\n");
+		return -ENFILE;
+	}
+
+	sock->type = type;
+
+	err = pf->create(&init_net, sock, proto, 1);
+	if (err) {
+		kfree(sock);
+		return err;
+	}
+
+	*res = sock;
+
+	return 0;
+}
+
+
+void log_sock(struct socket *socket)
+{
+	printk("\nNEW socket %p sk %p fsk %lx &sk %p &fsk %p\n\n",
+	       socket, socket->sk, socket->flags, &socket->sk, &socket->flags);
+}
+
+
+static void sock_init(void)
+{
+	skb_init();
+}
+
+
+core_initcall(sock_init);

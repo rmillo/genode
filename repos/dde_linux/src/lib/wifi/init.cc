@@ -19,9 +19,12 @@
 #include <firmware_list.h>
 #include <lx.h>
 
-#include <extern_c_begin.h>
-# include <lx_emul.h>
-#include <extern_c_end.h>
+#include <lx_emul.h>
+
+#include <lx_kit/irq.h>
+#include <lx_kit/work.h>
+#include <lx_kit/timer.h>
+
 
 extern "C" void core_netlink_proto_init(void);
 extern "C" void core_sock_init(void);
@@ -121,6 +124,8 @@ static void run_linux(void *)
 	}
 }
 
+unsigned long jiffies;
+
 
 void wifi_init(Server::Entrypoint &ep, Genode::Lock &lock)
 {
@@ -139,9 +144,13 @@ void wifi_init(Server::Entrypoint &ep, Genode::Lock &lock)
 	/* add init_net namespace to namespace list */
 	list_add_tail_rcu(&init_net.list, &net_namespace_list);
 
-	Lx::timer_init(ep);
-	Lx::irq_init(ep);
-	Lx::work_init(ep);
+	Lx::Scheduler &sched = Lx::scheduler();
+
+	Lx::Timer &timer = Lx::timer(&ep, &jiffies);
+
+	Lx::Irq::irq(&ep, Genode::env()->heap());
+	Lx::Work::work_queue(Genode::env()->heap());
+
 	Lx::socket_init(ep);
 	Lx::nic_init(ep);
 

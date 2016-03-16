@@ -24,13 +24,13 @@
 
 /* local includes */
 #include <lx.h>
-
-#include <extern_c_begin.h>
 #include <lx_emul.h>
-#include <linux/skbuff.h>
-#include <net/cfg80211.h>
-#include <lxc.h>
-#include <extern_c_end.h>
+
+#include <lx_emul/extern_c_begin.h>
+# include <linux/skbuff.h>
+# include <net/cfg80211.h>
+# include <lxc.h>
+#include <lx_emul/extern_c_end.h>
 
 extern bool config_verbose;
 
@@ -248,7 +248,7 @@ class Lx::Notifier
 			Block(struct notifier_block *nb) : nb(nb) { }
 		};
 
-		Lx::List<Block> _list;
+		Lx_kit::List<Block> _list;
 		Genode::Tslab<Block, 32 * sizeof(Block)> _block_alloc;
 
 	public:
@@ -357,7 +357,7 @@ extern "C" struct net_device * netdev_notifier_info_to_dev(struct netdev_notifie
 }
 
 
-struct Proto_hook : public Lx::List<Proto_hook>::Element
+struct Proto_hook : public Lx_kit::List<Proto_hook>::Element
 {
 	struct packet_type &pt;
 
@@ -369,7 +369,7 @@ class Proto_hook_list
 {
 	private:
 
-		Lx::List<Proto_hook>  _list;
+		Lx_kit::List<Proto_hook>  _list;
 		Genode::Allocator    &_alloc;
 
 	public:
