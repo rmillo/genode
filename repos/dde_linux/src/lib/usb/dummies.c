@@ -1094,7 +1094,10 @@ void dwc3_debugfs_exit(struct dwc3 *d) { SKIP; }
 /**************************
  ** linux/power_supply.h **
  **************************/
+
 #include <linux/power_supply.h>
-int power_supply_register(struct device *parent, struct power_supply *psy) { TRACE; return 0; }
+struct power_supply *
+power_supply_register(struct device *parent,  const struct power_supply_desc *desc,
+                      const struct power_supply_config *cfg) { TRACE; return 0; }
 void power_supply_unregister(struct power_supply *psy) { TRACE; }
 int power_supply_powers(struct power_supply *psy, struct device *dev) { TRACE; return 0; }

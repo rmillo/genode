@@ -843,6 +843,22 @@ int dev_set_drvdata(struct device *dev, void *data)
 
 const char *dev_name(const struct device *dev) { return dev->name; }
 
+/*******************************
+ ** asm-generic/bitops/find.h **
+ *******************************/
+
+unsigned long find_next_bit(const unsigned long *addr, unsigned long size,
+                            unsigned long offset)
+{
+	unsigned long i  = offset / BITS_PER_LONG;
+	offset -= (i * BITS_PER_LONG);
+
+	for (; offset < size; offset++)
+		if (addr[i] & (1UL << offset))
+			return offset;
+
+	return size;
+}
 
 long find_next_zero_bit_le(const void *addr,
                            unsigned long size, unsigned long offset)

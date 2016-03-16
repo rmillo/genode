@@ -93,6 +93,7 @@ static inline void bt()
 #define WARN_ONCE    WARN
 
 #define BUG_ON(condition) do { if (condition) BUG(); } while(0)
+#define BUILD_BUG() BUG();
 
 /*********************
  ** linux/kconfig.h **
@@ -275,13 +276,16 @@ typedef unsigned short ushort;
 #define __user   /* needed by usb/core/devices.c */
 #define __iomem  /* needed by usb/hcd.h */
 
-#define __releases(x) /* needed by usb/core/devio.c */
+#define __acquire(x)
 #define __acquires(x) /* needed by usb/core/devio.c */
+#define __release(x)
+#define __releases(x) /* needed by usb/core/devio.c */
 #define __force
 #define __maybe_unused
 #define __bitwise
 
 #define __rcu
+#define __must_hold(x)
 #define __must_check
 
 #define ACCESS_ONCE(x) (*(volatile typeof(x) *)&(x))
@@ -294,6 +298,8 @@ typedef unsigned short ushort;
 #undef __unused
 
 #define __printf(a, b) __attribute__((format(printf, a, b)))
+
+#define WRITE_ONCE(x, val) x=(val)
 
 
 /**************************
@@ -327,6 +333,14 @@ enum irqreturn {
 #define IRQ_RETVAL(x) ((x) != IRQ_NONE)
 
 typedef enum irqreturn irqreturn_t;
+
+
+/*********************
+ ** uapi/linux/uuid **
+ *********************/
+
+typedef struct { __u8 b[16]; } uuid_le;
+
 
 /*************************************
  ** linux/byteorder/little_endian.h **
@@ -560,6 +574,9 @@ static inline void panic(const char *fmt, ...)
 	while (1) ;
 }
 
+char *bin2hex(char *dst, const void *src, size_t count);
+int   hex2bin(u8 *dst, const char *src, size_t count);
+
 /*
  * Bits and types
  */
@@ -612,6 +629,12 @@ static inline size_t min(size_t a, size_t b) {
 {                                                 \
 	const typeof(y) __y = y;                        \
 	(((x) + (__y - 1)) / __y) * __y;                \
+})
+
+#define rounddown(x, y) (                         \
+{                                                 \
+	typeof(x) __x = (x);                            \
+	__x - (__x % (y));                              \
 })
 
 #define clamp_val(val, min, max) ({             \
@@ -721,6 +744,7 @@ void print_hex_dump(const char *level, const char *prefix_str,
 #define pr_err(fmt, ...) printk(KERN_ERR fmt, ##__VA_ARGS__)
 #define pr_debug(fmt, ...) printk(KERN_DEBUG fmt, ##__VA_ARGS__)
 #define pr_warning(fmt, ...) printk(KERN_WARNING fmt, ##__VA_ARGS__)
+#define pr_warn_once pr_warning
 #define pr_warn pr_warning
 
 bool printk_ratelimit();
@@ -747,15 +771,27 @@ static inline int _printk(const char *fmt, ...)
  ** linux/bitops.h, asm/bitops.h **
  **********************************/
 
-#include <asm-generic/bitops/__ffs.h>
 
-#define BIT(nr)	      (1UL << (nr))
-#define BITS_PER_LONG (sizeof(long) * 8)
-
+#define BIT(nr)       (1UL << (nr))
+#define BITS_PER_LONG (__SIZEOF_LONG__ * 8)
 #define BIT_MASK(nr)  (1UL << ((nr) % BITS_PER_LONG))
 #define BIT_WORD(nr)  ((nr) / BITS_PER_LONG)
 
+#include <asm-generic/bitops/__ffs.h>
+#include <asm-generic/bitops/__fls.h>
 #include <asm-generic/bitops/non-atomic.h>
+#include <asm-generic/bitops/fls64.h>
+
+/* normally declared in asm-generic/bitops/ffs.h */
+int ffs(int x);
+int fls(int x);
+
+static inline unsigned fls_long(unsigned long l)
+{
+	if (sizeof(l) == 4)
+		return fls(l);
+	return fls64(l);
+}
 
 #define test_and_clear_bit(nr, addr) \
 	__test_and_clear_bit(nr, (volatile unsigned long *)(addr))
@@ -769,28 +805,16 @@ static inline int _printk(const char *fmt, ...)
 /**
  * Find first zero bit (limit to machine word size)
  */
-long find_next_zero_bit_le(const void *addr,
-                           unsigned long size, unsigned long offset);
+long find_next_zero_bit_le(const void *addr, unsigned long size, unsigned long offset);
+unsigned long find_next_bit(const unsigned long *addr, unsigned long size, unsigned long offset);
 
 #define find_next_zero_bit find_next_zero_bit_le
-
-/* normally declared in asm-generic/bitops/ffs.h */
-int ffs(int x);
-int fls(int x);
-
-static inline unsigned find_next_bit(unsigned long where, unsigned size, unsigned bit)
-{
-	for (; bit < size; bit++)
-		if ((1 << bit) & where)
-			return bit;
-
-	return size;
-}
+#define find_first_bit(addr, size) find_next_bit((addr), (size), 0)
 
 #define for_each_set_bit(bit, addr, size) \
-	for ((e) = find_next_bit((*addr), (size), 0); \
-	(e) < (size);                                 \
-	(e) =  find_next_bit((*addr),(size), (e) + 1))
+	for ((bit) = find_first_bit((addr), (size)); \
+	     (bit) < (size);                    \
+	     (bit) = find_next_bit((addr), (size), (bit) + 1))
 
 
 /*****************************************
@@ -822,6 +846,7 @@ size_t strlcpy(char *dest, const char *src, size_t size);
 size_t strlen(const char *);
 char * strsep(char **,const char *);
 char *strstr(const char *, const char *);
+int   strtobool(const char *, bool *);
 char  *kstrdup(const char *s, gfp_t gfp);
 void  *kmemdup(const void *src, size_t len, gfp_t gfp);
 void  *memmove(void *, const void *, size_t);
@@ -921,8 +946,9 @@ static inline void __module_get(struct module *module) { }
  ******************/
 
 enum {
-	SLAB_HWCACHE_ALIGN = 0x00002000UL,
-	SLAB_CACHE_DMA     = 0x00004000UL,
+	SLAB_HWCACHE_ALIGN    = 0x00002000UL,
+	SLAB_CACHE_DMA        = 0x00004000UL,
+	ARCH_KMALLOC_MINALIGN = 128, 
 };
 
 void *kzalloc(size_t size, gfp_t flags);
@@ -963,6 +989,9 @@ void *kmem_cache_zalloc(struct kmem_cache *k, gfp_t flags);
  * Free slab
  */
 void  kmem_cache_free(struct kmem_cache *, void *);
+
+
+void *kmalloc_array(size_t n, size_t size, gfp_t flags);
 
 
 /**********************
@@ -1045,6 +1074,7 @@ void do_gettimeofday(struct timeval *tv);
 enum {
 	CLOCK_REALTIME  = 0,
 	CLOCK_MONOTONIC = 1,
+	CLOCK_BOOTTIME  = 7,
 	NSEC_PER_USEC   = 1000L,
 	NSEC_PER_MSEC   = 1000000L,
 	NSEC_PER_SEC    = 1000L * NSEC_PER_MSEC,
@@ -1089,6 +1119,19 @@ struct timeval ktime_to_timeval(const ktime_t);
 ktime_t ktime_get_real(void);
 ktime_t ktime_sub(const ktime_t, const ktime_t);
 ktime_t ktime_get_monotonic_offset(void);
+
+
+/*************************
+ ** linux/timekeeping.h **
+ *************************/
+
+enum tk_offsets {
+	TK_OFFS_BOOT = 1,
+};
+
+ktime_t ktime_get_boottime(void);
+ktime_t ktime_mono_to_any(ktime_t tmono, enum tk_offsets offs);
+ktime_t ktime_mono_to_real(ktime_t mono);
 
 /*******************
  ** linux/timer.h **
@@ -1148,12 +1191,20 @@ void msleep(unsigned int msecs);
 void udelay(unsigned long usecs);
 void mdelay(unsigned long usecs);
 
+void usleep_range(unsigned long min, unsigned long max);
+
 extern unsigned long loops_per_jiffy;  /* needed by 'dwc_otg_attr.c' */
 
 
 /***********************
  ** linux/workquque.h **
  ***********************/
+
+enum {
+	WORK_STRUCT_PENDING_BIT = 0,
+	WQ_FREEZABLE            = (1 << 2),
+};
+
 
 struct work_struct;
 typedef void (*work_func_t)(struct work_struct *work);
@@ -1175,6 +1226,14 @@ bool cancel_work_sync(struct work_struct *work);
 int cancel_delayed_work_sync(struct delayed_work *work);
 int schedule_delayed_work(struct delayed_work *work, unsigned long delay);
 int schedule_work(struct work_struct *work);
+
+#define work_pending(work) \
+        test_bit(WORK_STRUCT_PENDING_BIT, work_data_bits(work))
+
+#define delayed_work_pending(w) \
+         work_pending(&(w)->work)
+
+#define work_data_bits(work) ((unsigned long *)(&(work)->data))
 
 bool flush_work(struct work_struct *work);
 bool flush_work_sync(struct work_struct *work);
@@ -1212,7 +1271,10 @@ bool flush_work_sync(struct work_struct *work);
 
 /* dummy for queue_delayed_work call in storage/usb.c */
 #define system_freezable_wq 0
-struct workqueue_struct { };
+struct workqueue_struct { unsigned dummy; };
+
+extern struct workqueue_struct *system_power_efficient_wq;
+
 
 bool queue_delayed_work(struct workqueue_struct *,
                         struct delayed_work *, unsigned long);
@@ -1221,8 +1283,9 @@ bool cancel_delayed_work(struct delayed_work *);
 
 /* needed for 'dwc_common_linux.c' */
 struct workqueue_struct *create_singlethread_workqueue(char *n);
-
-void destroy_workqueue(struct workqueue_struct *wq);
+struct workqueue_struct *alloc_workqueue(const char *fmt, unsigned int flags,
+                                         int max_active, ...) __printf(1, 4);
+void   destroy_workqueue(struct workqueue_struct *wq);
 
 bool queue_work(struct workqueue_struct *wq, struct work_struct *work);
 
@@ -1574,10 +1637,14 @@ struct dev_pm_ops {
 
 enum { PM_EVENT_AUTO_SUSPEND = 0x402 };
 
+#define PMSG_AUTO_SUSPEND ((struct pm_message) \
+                           { .event = PM_EVENT_AUTO_SUSPEND, })
+
 /************************
  ** linux/pm_runtime.h **
  ************************/
 
+bool pm_runtime_active(struct device *dev);
 int  pm_runtime_set_active(struct device *dev);
 void pm_suspend_ignore_children(struct device *dev, bool enable);
 void pm_runtime_enable(struct device *dev);
@@ -1594,7 +1661,7 @@ void pm_runtime_set_autosuspend_delay(struct device *dev, int delay);
 int  pm_runtime_get_sync(struct device *dev);
 int  pm_runtime_put_sync(struct device *dev);
 int  pm_runtime_put(struct device *dev);
-
+int  pm_runtime_barrier(struct device *dev);
 
 /***********************
  ** linux/pm_wakeup.h **
@@ -1611,9 +1678,15 @@ bool device_can_wakeup(struct device *dev);
  ** linux/pm_qos.h **
  ********************/
 
- enum { PM_QOS_FLAG_NO_POWER_OFF = 1 };
+enum { PM_QOS_FLAG_NO_POWER_OFF = 1 };
+enum  dev_pm_qos_req_type { DEV_PM_QOS_FLAGS = 3 };
 
- int dev_pm_qos_expose_flags(struct device *dev, s32 value);
+struct dev_pm_qos_request { unsigned dummy; };
+
+int dev_pm_qos_add_request(struct device *dev, struct dev_pm_qos_request *req,
+                           enum dev_pm_qos_req_type type, s32 value);
+int dev_pm_qos_remove_request(struct dev_pm_qos_request *req);
+int dev_pm_qos_expose_flags(struct device *dev, s32 value);
 
 /********************
  ** linux/device.h **
@@ -1903,6 +1976,9 @@ size_t copy_to_user(void *dst, void const *src, size_t len);
 #define put_user(x, ptr) ({ lx_printf("put_user not implemented"); (0);})
 
 
+unsigned long clear_user(void *to, unsigned long n);
+
+
 /*****************
  ** linux/dmi.h **
  *****************/
@@ -2188,6 +2264,7 @@ enum {
 	GFP_ATOMIC   = 0x20u,
 	GFP_KERNEL   = 0x0u,
 	GFP_NOIO     = __GFP_WAIT,
+	GFP_NOWAIT   = 0x2000000u,
 };
 
 unsigned long __get_free_pages(gfp_t gfp_mask, unsigned int order);
@@ -2234,6 +2311,7 @@ bool is_highmem(void *);
 
 struct zone *page_zone(const struct page *page);
 int    is_vmalloc_addr(const void *x);
+void   kvfree(const void *addr);
 
 /*********************
  ** linux/pagemap.h **
@@ -2423,7 +2501,7 @@ void pci_disable_msi(struct pci_dev *);
 
 int  pci_enable_msix(struct pci_dev *, struct msix_entry *, int);
 void pci_disable_msix(struct pci_dev *);
-
+int  pci_enable_msix_exact(struct pci_dev *,struct msix_entry *, int);
 
 #include <linux/mod_devicetable.h>
 
@@ -2440,6 +2518,7 @@ struct pci_dev {
 	unsigned short vendor;
 	unsigned short device;
 	unsigned short subsystem_vendor;
+	unsigned short subsystem_device;
 	unsigned int   class;
 	u8             revision;
 	struct device dev; /* needed for intel-agp.c */
@@ -2847,6 +2926,8 @@ static inline void list_del_rcu(struct list_head *entry) {
  ** linux/lockdep.h **
  *********************/
 
+enum { SINGLE_DEPTH_NESTING = 1 };
+
 bool lockdep_is_held(void *);
 
 
@@ -2918,6 +2999,28 @@ void blk_complete_request(struct request *);
 sector_t blk_rq_pos(const struct request *rq);
 
 unsigned int queue_max_hw_sectors(struct request_queue *q);
+
+
+/********************
+ ** linux/blk-mq.h **
+ ********************/
+
+struct blk_mq_tag_set
+{
+	unsigned dummy;
+};
+
+
+/************************
+ ** scsi/scsci_proto.h **
+ ************************/
+
+enum {
+	SAM_STAT_GOOD                      = 0x00,
+	SAM_STAT_INTERMEDIATE              = 0x10,
+	SAM_STAT_INTERMEDIATE_CONDITION_MET= 0x14,
+	SAM_STAT_COMMAND_TERMINATED        = 0x22,
+};
 
 #include <scsi/scsi_host.h>
 
@@ -3079,14 +3182,19 @@ struct scsi_target
 	unsigned int     pdt_1f_for_no_lun:1;    /* PDT = 0x1f */
 	unsigned int     no_report_luns:1;       /* Don't use
 	                                          * REPORT LUNS for scanning. */
-	unsigned int     target_blocked;
+	atomic_t         target_blocked;
 	char             scsi_level;
 };
 
 enum scsi_device_state
 {
+	SDEV_CANCEL = 1,
 	SDEV_DEL, /* device deleted 
 	           * no commands allowed */
+};
+
+enum {
+	SCSI_VPD_PG_LEN  = 255,
 };
 
 struct scsi_device
@@ -3110,6 +3218,11 @@ struct scsi_device
 	char                  type;
 	char                  scsi_level;
 	unsigned char         inquiry_len;            /* valid bytes in 'inquiry' */
+
+	int                   vpd_pg83_len;
+	unsigned char        *vpd_pg83;
+	int                   vpd_pg80_len;
+	unsigned char        *vpd_pg80;
 	struct scsi_target   *sdev_target;            /* used only for single_lun */
 
 	unsigned              sdev_bflags;
@@ -3134,8 +3247,9 @@ struct scsi_device
 	unsigned              no_read_disc_info:1;    /* avoid READ_DISC_INFO cmds */
 	unsigned              try_rc_10_first:1;      /* Try READ_CAPACACITY_10 first */
 	unsigned              wce_default_on:1;       /* Cache is ON by default */
+	unsigned              broken_fua:1;           /* Don't set FUA bit */
 
-	unsigned int          device_blocked;         /* device returned QUEUE_FULL. */
+	atomic_t              device_blocked;         /* device returned QUEUE_FULL. */
 
 	atomic_t              iorequest_cnt;
 	struct device         sdev_gendev;
@@ -3374,12 +3488,15 @@ enum {
 
 	SPEED_100    = 100,
 	SPEED_1000   = 1000,
+	SUPPORTED_100baseT_Full  = (1 << 3),
+	SUPPORTED_1000baseT_Full = (1 << 5),
 };
 
 
 struct ethtool_cmd
 {
 	u32 cmd;
+	u16 speed;
 	u8  duplex;
 };
 
@@ -3407,11 +3524,20 @@ struct ethtool_drvinfo
 
 struct ethtool_wolinfo {
 	u32 supported;
-	u32	wolopts;
+	u32 wolopts;
 };
 
 struct ethhdr { };
 struct ethtool_ts_info; 
+
+struct ethtool_eee
+{
+	u32 supported;
+	u32 advertised;
+	u32 lp_advertised;
+	u32 eee_active;
+	u32 eee_enabled;
+};
 
 
 struct ethtool_ops
@@ -3431,7 +3557,8 @@ struct ethtool_ops
 	void    (*get_wol)(struct net_device *, struct ethtool_wolinfo *);
 	int     (*set_wol)(struct net_device *, struct ethtool_wolinfo *);
 	int     (*get_ts_info)(struct net_device *, struct ethtool_ts_info *);
-
+	int     (*get_eee)(struct net_device *, struct ethtool_eee *);
+	int     (*set_eee)(struct net_device *, struct ethtool_eee *);
 };
 
 __u32 ethtool_cmd_speed(const struct ethtool_cmd *);
@@ -3597,6 +3724,11 @@ enum {
 	MII_ADVERTISE = 0x4,
 	MII_LPA       = 0x5,
 	MII_CTRL1000  = 0x9,
+	MII_MMD_CTRL  = 0xd,
+	MII_MMD_DATA  = 0xe,
+	MII_PHYADDR   = 0x19,
+
+	MII_MMD_CTRL_NOINCR = 0x4000,
 
 	BMCR_RESET    = 0x8000, /* reset to default state */
 	BMCR_ANENABLE = 0x1000, /* enable auto negotiation */
@@ -3641,6 +3773,24 @@ int generic_mii_ioctl(struct mii_if_info *,
                       struct mii_ioctl_data *, int,
                       unsigned int *);
 struct mii_ioctl_data *if_mii(struct ifreq *);
+
+
+/***********************
+ ** uapi/linux/mdio.h **
+ ***********************/
+
+enum {
+	MDIO_MMD_PCS       = 3,
+	MDIO_MMD_AN        = 7,
+	MDIO_PCS_EEE_ABLE  = 20,
+	MDIO_AN_EEE_ADV    = 60,
+	MDIO_AN_EEE_LPABLE = 61,
+};
+
+
+u32 mmd_eee_cap_to_ethtool_sup_t(u16 eee_cap);
+u32 mmd_eee_adv_to_ethtool_adv_t(u16 eee_adv);
+u16 ethtool_adv_to_mmd_eee_adv_t(u32 adv);
 
 
 /**********************
@@ -3716,6 +3866,8 @@ struct async_domain { };
 
 #define ASYNC_DOMAIN(name) struct async_domain name = { };
 void async_unregister_domain(struct async_domain *domain);
+#define ASYNC_DOMAIN_EXCLUSIVE(_name)
+
 
 
 /*******************************
@@ -3738,6 +3890,7 @@ struct usbdevfs_hub_portinfo
 int bitmap_subset(const unsigned long *,
                   const unsigned long *, int);
 
+int bitmap_weight(const unsigned long *src, unsigned int nbits);
 
 /*******************
  ** linux/crc16.h **
@@ -3767,6 +3920,16 @@ typedef enum {
 	PHY_INTERFACE_MODE_MII = 1,
 } phy_interface_t;
 
+struct phy;
+
+int phy_init(struct phy *phy);
+int phy_exit(struct phy *phy);
+
+struct phy *phy_get(struct device *dev, const char *string);
+void   phy_put(struct phy *phy);
+
+int phy_power_on(struct phy *phy);
+int phy_power_off(struct phy *phy);
 
 /************************
  ** linux/usb/gadget.h **
@@ -3793,6 +3956,9 @@ struct radix_tree_root { };
 void *radix_tree_lookup(struct radix_tree_root *root, unsigned long index);
 int   radix_tree_insert(struct radix_tree_root *, unsigned long, void *);
 void *radix_tree_delete(struct radix_tree_root *, unsigned long);
+int   radix_tree_preload(gfp_t gfp_mask);
+void  radix_tree_preload_end(void);
+int   radix_tree_maybe_preload(gfp_t gfp_mask);
 
 /**********************************
  ** Platform specific defintions **
@@ -3880,6 +4046,13 @@ struct pt_regs { unsigned long dummy; };
 #define ARM_sp dummy
 #define ARM_fp dummy
 
+
+/*********************
+ ** otg_whitelist.h **
+ *********************/
+
+struct usb_device;
+static inline int is_targeted(struct usb_device *dev) { return 0; }
 
 /************************
  ** linux/tracepoint.h **

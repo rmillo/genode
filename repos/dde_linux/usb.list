@@ -114,6 +114,8 @@ linux-4.4.3/drivers/usb/storage/usb.h
 linux-4.4.3/drivers/usb/storage/usb.c
 linux-4.4.3/drivers/usb/storage/usual-tables.c
 linux-4.4.3/include/asm-generic/bitops/__ffs.h
+linux-4.4.3/include/asm-generic/bitops/__fls.h
+linux-4.4.3/include/asm-generic/bitops/fls64.h
 linux-4.4.3/include/asm-generic/bitops/non-atomic.h
 linux-4.4.3/include/asm-generic/ioctl.h
 linux-4.4.3/include/linux/hiddev.h
@@ -122,6 +124,7 @@ linux-4.4.3/include/linux/input.h
 linux-4.4.3/include/linux/input/mt.h
 linux-4.4.3/include/linux/leds.h
 linux-4.4.3/include/linux/list.h
+linux-4.4.3/include/linux/log2.h
 linux-4.4.3/include/linux/mod_devicetable.h
 linux-4.4.3/include/linux/netdev_features.h
 linux-4.4.3/include/linux/pci_ids.h
@@ -131,9 +134,12 @@ linux-4.4.3/include/linux/swab.h
 linux-4.4.3/include/linux/usb.h
 linux-4.4.3/include/linux/usb_usual.h
 linux-4.4.3/include/linux/usb/ch9.h
+linux-4.4.3/include/linux/usb/cdc.h
+linux-4.4.3/include/linux/usb/ehci-dbgp.h
 linux-4.4.3/include/linux/usb/ehci_def.h
 linux-4.4.3/include/linux/usb/hcd.h
 linux-4.4.3/include/linux/usb/input.h
+linux-4.4.3/include/linux/io-64-nonatomic-lo-hi.h
 linux-4.4.3/include/linux/usb/otg.h
 linux-4.4.3/include/linux/usb/phy.h
 linux-4.4.3/include/linux/usb/quirks.h
@@ -141,13 +147,16 @@ linux-4.4.3/include/linux/usb/storage.h
 linux-4.4.3/include/linux/usb/usbnet.h
 linux-4.4.3/include/scsi/scsi.h
 linux-4.4.3/include/scsi/scsi_host.h
+linux-4.4.3/include/scsi/scsi_proto.h
 linux-4.4.3/include/uapi/asm-generic/ioctl.h
 linux-4.4.3/include/uapi/linux/byteorder/little_endian.h
 linux-4.4.3/include/uapi/linux/hid.h
 linux-4.4.3/include/uapi/linux/input.h
+linux-4.4.3/include/uapi/linux/input-event-codes.h
 linux-4.4.3/include/uapi/linux/pci_regs.h
 linux-4.4.3/include/uapi/linux/stat.h
 linux-4.4.3/include/uapi/linux/swab.h
 linux-4.4.3/include/uapi/linux/usb/ch11.h
 linux-4.4.3/include/uapi/linux/usb/ch9.h
+linux-4.4.3/include/uapi/linux/usb/cdc.h
 linux-4.4.3/lib/int_sqrt.c
