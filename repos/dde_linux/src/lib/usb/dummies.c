@@ -640,6 +640,7 @@ int  pci_enable_msi(struct pci_dev *pdev) { TRACE; return -1; }
 void pci_disable_msi(struct pci_dev *pdev) { TRACE; }
 
 int  pci_enable_msix(struct pci_dev *pdev, struct msix_entry *entries, int vec) { TRACE; return -1; }
+int  pci_enable_msix_exact(struct pci_dev *pdef,struct msix_entry *entries, int vec) { TRACE; return -1; }
 void pci_disable_msix(struct pci_dev *pdev) { TRACE; }
 
 
@@ -1058,8 +1059,11 @@ u16 bitrev16(u16 in) { TRACE; return 0; }
  ************************/
 
 void *radix_tree_lookup(struct radix_tree_root *root, unsigned long index) { TRACE; return 0; }
-int radix_tree_insert(struct radix_tree_root *root, unsigned long index, void *item) { TRACE; return 0; }
 void *radix_tree_delete(struct radix_tree_root *root, unsigned long index) { TRACE; return 0; }
+void  radix_tree_preload_end(void) { TRACE; }
+
+int radix_tree_insert(struct radix_tree_root *root, unsigned long index, void *item) { TRACE; return 0; }
+int radix_tree_maybe_preload(gfp_t gfp_mask) { TRACE; return 0; }
 
 /******************
  ** linux/gpio.h **

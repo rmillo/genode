@@ -21,6 +21,7 @@ extern "C" void module_ehci_hcd_init();
 extern "C" void module_ehci_pci_init();
 extern "C" void module_uhci_hcd_init();
 extern "C" void module_xhci_hcd_init();
+extern "C" void module_xhci_pci_init();
 
 void platform_hcd_init(Services *s)
 {
@@ -29,8 +30,10 @@ void platform_hcd_init(Services *s)
 		module_ax88179_178a_driver_init();
 	}
 
-	if (s->xhci)
+	if (s->xhci) {
 		module_xhci_hcd_init();
+		module_xhci_pci_init();
+	}
 
 	/* ehci_hcd should always be loaded before uhci_hcd and ohci_hcd, not after */
 	if (s->ehci) {

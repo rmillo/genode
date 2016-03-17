@@ -24,7 +24,7 @@
 #define DEBUG_COMPLETION 0
 #define DEBUG_DMA        0
 #define DEBUG_DRIVER     0
-#define DEBUG_IRQ        0
+#define DEBUG_IRQ        1
 #define DEBUG_KREF       0
 #define DEBUG_PRINTK     1
 #define DEBUG_PCI        0

@@ -186,6 +186,7 @@ void Irq::check_irq()
 int request_irq(unsigned int irq, irq_handler_t handler, unsigned long flags,
                  const char *name, void *dev)
 {
+	PDBG("REQUEST IRQ %u", irq);
 	lx_log(DEBUG_IRQ, "Request irq %u handler %p", irq, handler);
 	Irq_context::request_irq(irq, handler, dev);
 	return 0;
