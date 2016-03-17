@@ -138,21 +138,21 @@ void assert_spin_locked(spinlock_t *lock) { TRACE;}
  ** linux/mutex.h **
  *******************/
 
-void mutex_lock_nested(struct mutex *lock, unsigned int subclass) { TRACE; }
-int  mutex_lock_interruptible(struct mutex *m) { TRACE; return 0; }
-void mutex_init  (struct mutex *m) { TRACE; }
-void mutex_lock  (struct mutex *m) { TRACE; }
-void mutex_unlock(struct mutex *m) { TRACE; }
+void mutex_lock_nested(struct mutex *lock, unsigned int subclass) { SKIP; }
+int  mutex_lock_interruptible(struct mutex *m) { SKIP; return 0; }
+void mutex_init  (struct mutex *m) { SKIP; }
+void mutex_lock  (struct mutex *m) { SKIP; }
+void mutex_unlock(struct mutex *m) { SKIP; }
 
 
 /*******************
  ** linux/rwsem.h **
  *******************/
 
-void down_read(struct rw_semaphore *sem) { TRACE; }
-void up_read(struct rw_semaphore *sem) { TRACE; }
-void down_write(struct rw_semaphore *sem) { TRACE; }
-void up_write(struct rw_semaphore *sem) { TRACE; }
+void down_read(struct rw_semaphore *sem) { SKIP; }
+void up_read(struct rw_semaphore *sem) { SKIP; }
+void down_write(struct rw_semaphore *sem) { SKIP; }
+void up_write(struct rw_semaphore *sem) { SKIP; }
 
 
 /*********************
@@ -208,16 +208,7 @@ void usleep_range(unsigned long min, unsigned long max) { TRACE; }
 struct workqueue_struct dummy;
 struct workqueue_struct *system_power_efficient_wq = &dummy;
 
-struct workqueue_struct *alloc_workqueue(const char *fmt, unsigned int flags,
-                                         int max_active, ...)
-{
-	TRACE;
-	return 0;
-}
-
 void destroy_workqueue(struct workqueue_struct *wq) { TRACE; }
-
-bool queue_work(struct workqueue_struct *wq, struct work_struct *work) { TRACE; return false; }
 
 bool cancel_work_sync(struct work_struct *work) { TRACE; return 0; }
 int cancel_delayed_work_sync(struct delayed_work *work) { TRACE; return 0; }
@@ -308,24 +299,24 @@ ssize_t simple_read_from_buffer(void __user *to, size_t count,
  ** linux/pm_runtime.h **
  ************************/
 
-bool pm_runtime_active(struct device *dev) { TRACE; return false; }
-int  pm_runtime_set_active(struct device *dev) { TRACE; return 0; }
-void pm_suspend_ignore_children(struct device *dev, bool enable) { TRACE; }
-void pm_runtime_enable(struct device *dev) { TRACE; }
-void pm_runtime_disable(struct device *dev) { TRACE; }
-void pm_runtime_allow(struct device *dev) { TRACE; }
-void pm_runtime_forbid(struct device *dev) { TRACE; }
-void pm_runtime_set_suspended(struct device *dev) { TRACE; }
-void pm_runtime_get_noresume(struct device *dev) { TRACE; }
-void pm_runtime_put_noidle(struct device *dev) { TRACE; }
-void pm_runtime_use_autosuspend(struct device *dev) { TRACE; }
-int  pm_runtime_put_sync_autosuspend(struct device *dev) { TRACE; return 0; }
-void pm_runtime_no_callbacks(struct device *dev) { TRACE; }
-void pm_runtime_set_autosuspend_delay(struct device *dev, int delay) { TRACE; }
-int  pm_runtime_get_sync(struct device *dev) { TRACE; return 0; }
-int  pm_runtime_put_sync(struct device *dev) { TRACE; return 0; }
-int  pm_runtime_put(struct device *dev) { TRACE; return 0; }
-int  pm_runtime_barrier(struct device *dev) { TRACE; return 0; }
+bool pm_runtime_active(struct device *dev) { SKIP; return true; }
+int  pm_runtime_set_active(struct device *dev) { SKIP; return 0; }
+void pm_suspend_ignore_children(struct device *dev, bool enable) { SKIP; }
+void pm_runtime_enable(struct device *dev) { SKIP; }
+void pm_runtime_disable(struct device *dev) { SKIP; }
+void pm_runtime_allow(struct device *dev) { SKIP; }
+void pm_runtime_forbid(struct device *dev) { SKIP; }
+void pm_runtime_set_suspended(struct device *dev) { SKIP; }
+void pm_runtime_get_noresume(struct device *dev) { SKIP; }
+void pm_runtime_put_noidle(struct device *dev) { SKIP; }
+void pm_runtime_use_autosuspend(struct device *dev) { SKIP; }
+int  pm_runtime_put_sync_autosuspend(struct device *dev) { SKIP; return 0; }
+void pm_runtime_no_callbacks(struct device *dev) { SKIP; }
+void pm_runtime_set_autosuspend_delay(struct device *dev, int delay) { SKIP; }
+int  pm_runtime_get_sync(struct device *dev) { SKIP; return 0; }
+int  pm_runtime_put_sync(struct device *dev) { SKIP; return 0; }
+int  pm_runtime_put(struct device *dev) { SKIP; return 0; }
+int  pm_runtime_barrier(struct device *dev) { SKIP; return 0; }
 
 
 /***********************
@@ -778,10 +769,11 @@ int match_octal(substring_t *s, int *result) { TRACE; return 0; }
 /*********************
  ** linux/semaphore **
  *********************/
-void sema_init(struct semaphore *sem, int val) { TRACE; }
-int  down_trylock(struct semaphore *sem) { TRACE; return 0; }
-int  down_interruptible(struct semaphore *sem) { TRACE; return 0; }
-void up(struct semaphore *sem) { TRACE; }
+
+void sema_init(struct semaphore *sem, int val) { SKIP; }
+int  down_trylock(struct semaphore *sem) { SKIP; return 0; }
+int  down_interruptible(struct semaphore *sem) { SKIP; return 0; }
+void up(struct semaphore *sem) { SKIP; }
 
 
 /*******************

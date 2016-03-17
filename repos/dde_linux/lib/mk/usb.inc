@@ -3,7 +3,7 @@ LIB_INC_DIR = $(LIB_DIR)/include
 
 LIBS     += usb_include libc-setjmp config
 SRC_CC   += main.cc lx_emul.cc irq.cc timer.cc event.cc storage.cc \
-            input_component.cc nic.cc raw.cc
+            input_component.cc nic.cc raw.cc lx_console.cc
 SRC_C    += dummies.c scsi.c evdev.c raw_driver.c
 
 LX_CONTRIB_DIR := $(call select_from_ports,dde_linux)/src/lib/usb

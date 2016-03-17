@@ -141,22 +141,6 @@ extern int fiq_enable, fiq_fsm_enable;
 
 
 /***********************
- ** linux/workqueue.h **
- ***********************/
-
-struct workqueue_struct *create_singlethread_workqueue(char *)
-{
-	workqueue_struct *wq = (workqueue_struct *)kzalloc(sizeof(workqueue_struct), 0);
-	return wq;
-}
-
-void destroy_workqueue(struct workqueue_struct *wq) { TRACE; }
-
-
-bool queue_work(struct workqueue_struct *wq, struct work_struct *work) { TRACE; return 0; }
-
-
-/***********************
  ** asm/dma_mapping.h **
  ***********************/
 

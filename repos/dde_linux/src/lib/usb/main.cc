@@ -50,6 +50,7 @@ bool     Routine::_all        = false;
 
 void breakpoint() { PDBG("BREAK"); }
 
+extern "C" int stdout_write(const char *);
 
 static void init(Services *services)
 {

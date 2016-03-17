@@ -36,6 +36,8 @@ struct platform_device
 #define smp_rmb() barrier()
 #define smp_wmb() barrier()
 
+#define dev_is_pci(d) (1)
+
 static inline void barrier() { asm volatile ("": : :"memory"); }
 
 #endif /* _X86_32__PLATFORM__LX_EMUL_ */

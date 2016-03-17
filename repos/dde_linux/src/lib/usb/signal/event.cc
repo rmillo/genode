@@ -298,3 +298,28 @@ void tasklet_hi_schedule(struct tasklet_struct *tasklet)
 	 */
 	tasklet->func(tasklet->data);
 }
+
+
+/***********************
+ ** linux/workqueue.h **
+ ***********************/
+
+struct workqueue_struct *create_singlethread_workqueue(char *)
+{
+	workqueue_struct *wq = (workqueue_struct *)kzalloc(sizeof(workqueue_struct), 0);
+	return wq;
+}
+
+
+struct workqueue_struct *alloc_workqueue(const char *fmt, unsigned int flags,
+                                         int max_active, ...)
+{
+	return create_singlethread_workqueue(nullptr);
+}
+
+bool queue_work(struct workqueue_struct *wq, struct work_struct *work)
+{
+	Work::schedule(work);
+	return true;
+}
+

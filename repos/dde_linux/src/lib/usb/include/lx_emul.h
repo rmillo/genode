@@ -26,16 +26,16 @@
 #define DEBUG_DRIVER     0
 #define DEBUG_IRQ        0
 #define DEBUG_KREF       0
-#define DEBUG_PRINTK     0
+#define DEBUG_PRINTK     1
 #define DEBUG_PCI        0
 #define DEBUG_SKB        0
 #define DEBUG_SLAB       0
 #define DEBUG_TIMER      0
 #define DEBUG_THREAD     0
-#define DEBUG_TRACE      0
+#define DEBUG_TRACE      1
 
 #define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
-#define LINUX_VERSION_CODE KERNEL_VERSION(3,9,0)
+#define LINUX_VERSION_CODE KERNEL_VERSION(4,4,3)
 
 #define KBUILD_MODNAME "mod-noname"
 
@@ -1702,6 +1702,7 @@ int dev_pm_qos_expose_flags(struct device *dev, s32 value);
 #if DEBUG_PRINTK
 #define dev_dbg(dev, format, arg...)  lx_printf("dev_dbg: " format, ## arg)
 #define dev_vdbg(dev, format, arg...) lx_printf("dev_dbg: " format, ## arg)
+#define CONFIG_DYNAMIC_DEBUG
 #else
 #define dev_dbg( dev, format, arg...)
 #define dev_vdbg( dev, format, arg...)
