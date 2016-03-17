@@ -17,6 +17,7 @@
 /* Genode includes */
 #include <os/attached_dataspace.h>
 #include <io_mem_session/io_mem_session.h>
+#include <rm_session/connection.h>
 
 /* Linux emulation environment includes */
 #include <lx_emul/impl/internal/list.h>

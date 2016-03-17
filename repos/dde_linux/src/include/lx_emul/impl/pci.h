@@ -44,9 +44,10 @@ extern "C" int pci_register_driver(struct pci_driver *driver)
 
 		/* look if we find the device ID in the driver's 'id_table' */
 		pci_device_id const *matching_id = nullptr;
-		for (pci_device_id const *id = id_table; id->class_ != 0; id++)
+		for (pci_device_id const *id = id_table; id->device; id++) {
 			if (id->device == device_id)
 				matching_id = id;
+		}
 
 		/* skip device that is not handled by driver */
 		if (!matching_id)

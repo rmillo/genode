@@ -44,6 +44,8 @@ class Lx::Pci_dev_registry
 			_devs.insert(pci_dev);
 		}
 
+		Pci_dev* first() { return _devs.first(); }
+
 		Genode::Io_mem_dataspace_capability io_mem(resource_size_t         phys,
 		                                           Genode::Cache_attribute cache_attribute,
 		                                           Genode::size_t          size,

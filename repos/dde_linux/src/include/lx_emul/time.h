@@ -24,7 +24,11 @@ struct timespec {
 	long            tv_nsec;
 };
 
-struct timeval { };
+struct timeval
+{
+	__kernel_time_t      tv_sec;
+	__kernel_suseconds_t tv_usec;
+};
 struct timespec current_kernel_time(void);
 void do_gettimeofday(struct timeval *tv);
 
