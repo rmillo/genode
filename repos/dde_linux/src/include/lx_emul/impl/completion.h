@@ -5,11 +5,14 @@
  */
 
 /*
- * Copyright (C) 2015 Genode Labs GmbH
+ * Copyright (C) 2015-2016 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
  */
+
+/* Linux kint includes */
+#include <lx_kit/internal/task.h>
 
 typedef Lx::Task::List_element Wait_le;
 typedef Lx::Task::List         Wait_list;

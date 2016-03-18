@@ -5,16 +5,15 @@
  */
 
 /*
- * Copyright (C) 2015 Genode Labs GmbH
+ * Copyright (C) 2015-2016 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
  */
 
-#include <io_mem_session/connection.h>
-
-#include <lx_emul/impl/internal/pci_dev_registry.h>
-#include <lx_emul/impl/internal/mapped_io_mem_range.h>
+/* Linux kit includes */
+#include <lx_kit/pci_dev_registry.h>
+#include <lx_kit/mapped_io_mem_range.h>
 
 
 extern void pci_dev_put(struct pci_dev *pci_dev)
@@ -199,4 +198,3 @@ extern "C" int pcie_capability_read_word(struct pci_dev *pdev, int pos, u16 *val
 
 	return 1;
 }
-//
