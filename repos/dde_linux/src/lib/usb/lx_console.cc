@@ -18,7 +18,7 @@ class Format_command
 {
 	public:
 
-		enum Type   { INT, UINT, STRING, CHAR, PTR, PERCENT, INVALID };
+		enum Type   { INT, UINT, STRING, CHAR, PTR, PERCENT, VA_FORMAT, INVALID };
 		enum Length { DEFAULT, LONG, SIZE_T, LONG_LONG };
 
 	private:
@@ -117,6 +117,17 @@ class Format_command
 			}
 
 			/* eat type character */
+			consumed++;
+
+			if (type != PTR || !format[consumed])
+				return;
+
+			switch (format[consumed]) {
+
+				case 'V': type = VA_FORMAT; break;
+				default: return;
+			}
+
 			consumed++;
 		}
 
@@ -339,6 +350,16 @@ class Lx::Console : public Genode::Console
 					case Format_command::PERCENT:
 
 						_out_char('%');
+						break;
+
+					case Format_command::VA_FORMAT: /* %pV */
+					{
+						va_list va;
+						va_format * vf = va_arg(list, va_format *);
+						va_copy(va,  *vf->va);
+						vprintf(vf->fmt, va);
+						va_end(va);
+					}
 						break;
 
 					case Format_command::INVALID:
