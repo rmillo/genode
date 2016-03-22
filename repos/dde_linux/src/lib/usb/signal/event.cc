@@ -89,6 +89,7 @@ class Work : public Genode::List<Work>::Element
 		static void exec()
 		{
 			while (_list()->first()) {
+
 				Work *w = _list()->first();
 				_list()->remove(w);
 
@@ -321,5 +322,16 @@ bool queue_work(struct workqueue_struct *wq, struct work_struct *work)
 {
 	Work::schedule(work);
 	return true;
+}
+
+
+/**********
+ ** init **
+ **********/
+
+void Event::loop()
+{
+	while (true)
+		__wait_event();
 }
 

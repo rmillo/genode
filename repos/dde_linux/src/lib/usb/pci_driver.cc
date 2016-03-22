@@ -411,7 +411,7 @@ int pci_register_driver(struct pci_driver *drv)
 				found = true;
 
 			} catch (Platform::Device::Quota_exceeded) {
-				Genode::env()->parent()->upgrade(pci.cap(), "ram_quota=4096");
+				Genode::env()->parent()->upgrade(pci.cap(), "ram_quota=16384");
 				continue;
 			} catch (...) {
 				destroy(env()->heap(), pci_drv);

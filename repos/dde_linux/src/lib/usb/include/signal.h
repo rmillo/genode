@@ -88,6 +88,7 @@ namespace Irq
 namespace Event
 {
 	void init(Server::Entrypoint &ep);
+	void loop();
 }
 
 namespace Storage

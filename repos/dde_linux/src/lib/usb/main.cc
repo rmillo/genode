@@ -52,8 +52,10 @@ void breakpoint() { PDBG("BREAK"); }
 
 extern "C" int stdout_write(const char *);
 
-static void init(Services *services)
+static int init(void *s)
 {
+	Services *services = (Services *)s;
+
 	/*
 	 * The RAW driver is initialized first to make sure that it doesn't miss
 	 * notifications about added devices.
@@ -81,18 +83,24 @@ static void init(Services *services)
 		//module_wacom_driver_init();
 	}
 
+	/* storage */
+	if (services->stor) {
+		PERR("USB storage");
+		module_usb_storage_driver_init();
+	}
+
 	/* host controller */
 	platform_hcd_init(services);
 
-	/* storage */
-	if (services->stor)
-		module_usb_storage_driver_init();
+	Event::loop();
+
+	return 0;
 }
 
 
 void start_usb_driver(Server::Entrypoint &ep)
 {
-	Services services;
+	static Services services;
 
 	if (services.hid)
 		start_input_service(&ep.rpc_ep(), &services);
@@ -108,7 +116,10 @@ void start_usb_driver(Server::Entrypoint &ep)
 
 	Routine::add(0, 0, "Main", true);
 	Routine::make_main_current();
-	init(&services);
 
+	/* add driver thread */
+	Routine::add(init, &services, "driver");
+
+	/* start driver thread */
 	Routine::main();
 }

@@ -48,6 +48,7 @@ class Format_command
 		int    base      = 10;       /* base of numeric arguments          */
 		bool   zeropad   = false;    /* pad with zero instead of space     */
 		bool   uppercase = false;    /* use upper case for hex numbers     */
+		bool   prefix    = false;    /* prefix with 0x                     */
 		int    consumed  = 0;        /* nb of consumed format string chars */
 
 		/**
@@ -60,6 +61,10 @@ class Format_command
 			/* check for command begin and eat the character */
 			if (format[consumed] != '%') return;
 			if (!format[++consumed]) return;
+
+			/* check for %$x syntax */
+			prefix = (format[consumed] == '#');
+			if (prefix && !format[++consumed]) return;
 
 			/* heading zero indicates zero-padding */
 			zeropad = (format[consumed] == '0');
@@ -325,7 +330,11 @@ class Lx::Console : public Genode::Console
 
 					case Format_command::UINT:
 
+						if (cmd.prefix && cmd.base == 16)
+							_out_string("0x");
+
 						if (cmd.length == Format_command::LONG_LONG) {
+
 							_out_unsigned<unsigned long long>(numeric_arg, cmd.base, cmd.padding);
 							break;
 						}
@@ -355,7 +364,7 @@ class Lx::Console : public Genode::Console
 					case Format_command::VA_FORMAT: /* %pV */
 					{
 						va_list va;
-						va_format * vf = va_arg(list, va_format *);
+						va_format *vf = va_arg(list, va_format *);
 						va_copy(va,  *vf->va);
 						vprintf(vf->fmt, va);
 						va_end(va);
