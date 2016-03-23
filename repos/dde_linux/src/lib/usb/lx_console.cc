@@ -18,7 +18,8 @@ class Format_command
 {
 	public:
 
-		enum Type   { INT, UINT, STRING, CHAR, PTR, PERCENT, VA_FORMAT, INVALID };
+		enum Type   { INT, UINT, STRING, CHAR, PTR, PERCENT, VA_FORMAT, MAC,
+		              IPV4, INVALID };
 		enum Length { DEFAULT, LONG, SIZE_T, LONG_LONG };
 
 	private:
@@ -130,6 +131,15 @@ class Format_command
 			switch (format[consumed]) {
 
 				case 'V': type = VA_FORMAT; break;
+				case 'M': type = MAC; base = 16; padding = 2; break;
+
+				case 'I':
+
+					if (format[consumed + 1] != '4') break;
+					consumed++;
+					type = IPV4; base = 10;
+					break;
+
 				default: return;
 			}
 
@@ -368,6 +378,26 @@ class Lx::Console : public Genode::Console
 						va_copy(va,  *vf->va);
 						vprintf(vf->fmt, va);
 						va_end(va);
+					}
+						break;
+
+					case Format_command::MAC: /* %pM */
+					{
+						unsigned char const *mac = va_arg(list, unsigned char const *);
+						for (int i = 0; i < ETH_ALEN; i++) {
+							if (i) _out_char(':');
+							_out_unsigned<unsigned char>(mac[i], cmd.base, cmd.padding);
+						}
+						break;
+					}
+
+					case Format_command::IPV4: /* %pI4 */
+					{
+						unsigned char const *ip = va_arg(list, unsigned char const *);
+						for (int i = 0; i < 4; i++) {
+							if (i) _out_char('.');
+							_out_unsigned<unsigned char>(ip[i], cmd.base, cmd.padding);
+						}
 					}
 						break;
 
