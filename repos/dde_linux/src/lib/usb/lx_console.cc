@@ -165,7 +165,7 @@ static char ascii(int digit, int uppercase = 0)
 }
 
 
-class Lx::Console : public Genode::Console
+class Lx::Console
 {
 	private:
 
@@ -260,7 +260,7 @@ class Lx::Console : public Genode::Console
 
 	protected:
 
-		void _out_char(char c) override
+		void _out_char(char c)
 		{
 			if (c == '\n' || _idx == BUF_SIZE || c == 0)
 				_flush();
@@ -268,7 +268,7 @@ class Lx::Console : public Genode::Console
 				_buf[_idx++] = c;
 		}
 
-		void _out_string(const char *str) override
+		void _out_string(const char *str)
 		{
 			if (str)
 				while (*str) _out_char(*str++);

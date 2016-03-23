@@ -777,14 +777,14 @@ static inline int _printk(const char *fmt, ...)
 #define BIT_MASK(nr)  (1UL << ((nr) % BITS_PER_LONG))
 #define BIT_WORD(nr)  ((nr) / BITS_PER_LONG)
 
+/* normally declared in asm-generic/bitops/ffs.h */
+int ffs(int x);
+int fls(int x);
+
 #include <asm-generic/bitops/__ffs.h>
 #include <asm-generic/bitops/__fls.h>
 #include <asm-generic/bitops/non-atomic.h>
 #include <asm-generic/bitops/fls64.h>
-
-/* normally declared in asm-generic/bitops/ffs.h */
-int ffs(int x);
-int fls(int x);
 
 static inline unsigned fls_long(unsigned long l)
 {

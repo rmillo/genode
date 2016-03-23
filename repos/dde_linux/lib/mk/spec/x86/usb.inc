@@ -1,4 +1,5 @@
 SRC_C   += $(addprefix usb/host/,pci-quirks.c uhci-hcd.c ehci-pci.c)
+SRC_C   += usb/core/hcd-pci.c
 
 #
 # USB netwpork support

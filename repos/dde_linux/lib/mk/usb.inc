@@ -41,7 +41,10 @@ CC_OPT += -DMOD_SUFFIX=$(MOD_SUFFIX)
 SRC_C += lib/int_sqrt.c
 
 # USB core
-SRC_C += $(addprefix usb/core/,$(notdir $(wildcard $(USB_DIR)/core/*.c)))
+SRC_C += $(addprefix usb/core/, buffer.c config.c devices.c driver.c endpoint.c file.c \
+                                generic.c hcd.c hub.c message.c notify.c port.c quirks.c\
+                                urb.c usb.c)
+
 
 # USB host-controller driver
 SRC_C += $(addprefix usb/host/, ehci-hcd.c)
