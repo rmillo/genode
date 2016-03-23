@@ -34,7 +34,19 @@ int sock_register(const struct net_proto_family *ops)
 
 struct socket *sock_alloc(void)
 {
-	return (struct socket *)kmalloc(sizeof(struct socket), 0);
+	struct socket *sock = (struct socket *)kzalloc(sizeof(struct socket), 0);
+
+	/*
+	 * Linux normally allocates the socket_wq when calling
+	 * sock_alloc_inode() while we do it here hoping for the best.
+	 */
+	sock->wq = (struct socket *)kzalloc(sizeof(*sock->wq), 0);
+	if (!sock->wq) {
+		kfree(sock);
+		return NULL;
+	}
+
+	return sock;
 }
 
 
@@ -52,7 +64,7 @@ int sock_create_lite(int family, int type, int protocol, struct socket **res)
 }
 
 
-int sock_create_kern(int family, int type, int proto,
+int sock_create_kern(struct net *net, int family, int type, int proto,
                      struct socket **res)
 {
 	struct socket *sock;
@@ -72,7 +84,8 @@ int sock_create_kern(int family, int type, int proto,
 		return -ENOPROTOOPT;
 	}
 
-	if (!(sock = (struct socket *)kzalloc(sizeof(struct socket), 0))) {
+	sock = sock_alloc();
+	if (!sock) {
 		printk("Could not allocate socket\n");
 		return -ENFILE;
 	}

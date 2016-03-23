@@ -36,6 +36,7 @@ namespace Linux {
 		extern int sock_getsockopt(struct socket *sock, int level,
 		                           int op, char __user *optval,
 		                           int __user *optlen);
+		struct socket *sock_alloc(void);
 		#include <lx/extern_c_end.h>
 }
 
@@ -169,8 +170,8 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 		{
 			using namespace Linux;
 
-			struct socket *sock = call_socket();
-			struct socket *new_sock = (struct socket *)kzalloc(sizeof(struct socket), 0);
+			struct socket *sock     = call_socket();
+			struct socket *new_sock = sock_alloc();
 
 			_handle.socket = 0;
 
@@ -186,7 +187,6 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 			}
 
 			_handle.socket = static_cast<void *>(new_sock);
-
 
 			if (!_call.accept.addr)
 				return;
@@ -216,6 +216,7 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 			if (s->ops)
 				s->ops->release(s);
 
+			kfree(s->wq);
 			kfree(s);
 		}
 
@@ -299,10 +300,12 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 			struct msghdr msg;
 			struct iovec  iov;
 
-			msg.msg_control    = NULL;
-			msg.msg_controllen = 0;
-			msg.msg_iovlen     = 1;
-			msg.msg_iov        = &iov;
+			msg.msg_control      = nullptr;
+			msg.msg_controllen   = 0;
+			msg.msg_iter.iov     = &iov;
+			msg.msg_iter.nr_segs = 1;
+			msg.msg_iter.count   = _call.msg.len;
+
 			iov.iov_len        = _call.msg.len;
 			iov.iov_base       = _call.msg.buf;
 			msg.msg_name       = _call.addr_len ? &_call.addr : 0;
@@ -313,7 +316,7 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 				msg.msg_flags |= MSG_DONTWAIT;
 
 			//XXX: check for non-blocking flag
-			_result.err = call_socket()->ops->recvmsg(0, call_socket(), &msg,
+			_result.err = call_socket()->ops->recvmsg(call_socket(), &msg,
 			                                          _call.msg.len,
 			                                          _call.msg.flags);
 
@@ -333,10 +336,12 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 			if (_result.err < 0)
 				return;
 
-			msg.msg_control    = NULL;
-			msg.msg_controllen = 0;
-			msg.msg_iovlen     = 1;
-			msg.msg_iov        = &iov;
+			msg.msg_control      = nullptr;
+			msg.msg_controllen   = 0;
+			msg.msg_iter.iov     = &iov;
+			msg.msg_iter.nr_segs = 1;
+			msg.msg_iter.count   = _call.msg.len;
+
 			iov.iov_len        = _call.msg.len;
 			iov.iov_base       = _call.msg.buf;
 			msg.msg_name       = _call.addr_len ? &_call.addr : 0;
@@ -346,7 +351,7 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 			if (_call.handle.non_block)
 				msg.msg_flags |= MSG_DONTWAIT;
 
-			_result.err = call_socket()->ops->sendmsg(0, call_socket(), &msg,
+			_result.err = call_socket()->ops->sendmsg(call_socket(), &msg,
 			                                          _call.msg.len);
 		}
 
@@ -370,15 +375,15 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 			int type = _call.socket.type == Lxip::TYPE_STREAM ? SOCK_STREAM  :
 			                                                    SOCK_DGRAM;
 
-			struct socket *s = (struct socket *)kzalloc(sizeof(struct socket), 0);
+			struct socket *s = sock_alloc();
 
-			if (!sock_create_kern(AF_INET, type, 0, &s)) {
-				_handle.socket = static_cast<void *>(s);
+			if (sock_create_kern(nullptr, AF_INET, type, 0, &s)) {
+				_handle.socket = 0;
+				kfree(s);
 				return;
 			}
 
-			_handle.socket = 0;
-			kfree(s);
+			_handle.socket = static_cast<void *>(s);
 		}
 
 	public:

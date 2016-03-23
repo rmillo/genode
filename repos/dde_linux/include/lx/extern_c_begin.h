@@ -24,3 +24,4 @@ extern "C" {
 #define private private_
 #define class   class_
 #define new     new_
+#define delete  delete_

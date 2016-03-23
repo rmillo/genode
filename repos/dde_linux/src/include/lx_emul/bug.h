@@ -21,12 +21,12 @@
 
 #define WARN_ON(condition) ({ \
 	int ret = !!(condition); \
-	if (ret) lx_printf("[%s] WARN_ON(" #condition ") ", __func__); \
+	if (ret) lx_printf("[%s] WARN_ON(" #condition ") \n", __func__); \
 	ret; })
 
 #define WARN(condition, fmt, arg...) ({ \
 	int ret = !!(condition); \
-	if (ret) lx_printf("[%s] *WARN* " fmt , __func__ , ##arg); \
+	if (ret) lx_printf("[%s] *WARN* " fmt " \n", __func__ , ##arg); \
 	ret; })
 
 #define BUG() do { \

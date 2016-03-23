@@ -33,8 +33,6 @@
 
 unsigned long jiffies;
 
-unsigned long msecs_to_jiffies(const unsigned int m) { return m / (1000 / HZ); }
-
 /**
  * Lx::Timer
  */

@@ -25,11 +25,108 @@
 #define DEBUG_CONG   0
 #define DEBUG_LEVEL  0
 
-
-#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
-#define LINUX_VERSION_CODE KERNEL_VERSION(3,9,0)
-
 #define KBUILD_MODNAME "mod-noname"
+
+
+/*******************
+ ** linux/types.h **
+ *******************/
+
+typedef uint32_t uint;
+
+typedef int8_t   s8;
+typedef int16_t  s16;
+typedef int32_t  s32;
+typedef int64_t  s64;
+
+typedef uint8_t  u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef uint64_t u64;
+
+
+
+typedef uint8_t  __u8;
+typedef uint16_t __u16;
+typedef uint32_t __u32;
+typedef uint64_t __u64;
+
+typedef __u8  u_int8_t;
+
+typedef int16_t  __s16;
+typedef int32_t  __s32;
+typedef int64_t  __s64;
+
+typedef __u16 __le16;
+typedef __u32 __le32;
+typedef __u64 __le64;
+
+typedef __u16 __be16;
+typedef __u32 __be32;
+typedef __u64 __be64;
+
+typedef __u16 __sum16;
+typedef __u32 __wsum;
+
+typedef unsigned       gfp_t;
+typedef unsigned long  dma_addr_t;
+typedef long long      loff_t;
+typedef size_t       __kernel_size_t;
+typedef long         __kernel_time_t;
+typedef long         __kernel_suseconds_t;
+typedef int            pid_t;
+typedef long           ssize_t;
+typedef unsigned short umode_t;
+typedef unsigned long  clock_t;
+typedef int            pid_t;
+typedef unsigned int   uid_t;
+typedef unsigned int   gid_t;
+typedef unsigned short mode_t;
+
+#define __aligned_u64 __u64 __attribute__((aligned(8)))
+
+#define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
+#define BITS_TO_LONGS(nr)       DIV_ROUND_UP(nr, 8 * sizeof(long))
+#define DECLARE_BITMAP(name,bits) \
+	unsigned long name[BITS_TO_LONGS(bits)]
+
+struct list_head {
+	struct list_head *next, *prev;
+};
+
+struct hlist_head {
+	struct hlist_node *first;
+};
+
+struct hlist_node {
+	struct hlist_node *next, **pprev;
+};
+
+#ifndef __cplusplus
+typedef _Bool bool;
+enum { true = 1, false = 0 };
+#endif /* __cplusplus */
+
+#ifndef NULL
+#ifdef __cplusplus
+#define NULL nullptr
+#else
+#define NULL ((void *)0)
+#endif /* __cplusplus */
+#endif /* NULL */
+
+#define __bitwise
+
+
+/************************
+ ** uapi/linux/types.h **
+ ************************/
+
+struct callback_head {
+	struct callback_head *next;
+	void (*func)(struct callback_head *head);
+};
+#define rcu_head callback_head
 
 
 /*******************************
@@ -110,36 +207,6 @@ enum {
 };
 
 
-/**********************
- ** linux/compiler.h **
- **********************/
-
-#define likely
-#define unlikely
-
-#define __user
-#define __rcu
-#define __percpu
-#define __must_check
-#define __force
-
-#define __releases(x)
-#define __acquires(x)
-
-#define __aligned(x)  __attribute__((aligned(x)))
-
-#define noinline_for_stack
-#define noinline     __attribute__((noinline))
-
-#define __printf(a, b) __attribute__((format(printf, a, b)))
-#define __attribute_const__  __attribute__((__const__))
-
-#define ACCESS_ONCE(x) (*(volatile typeof(x) *)&(x))
-
-#define __HAVE_BUILTIN_BSWAP32__
-#define __HAVE_BUILTIN_BSWAP64__
-
-
 /******************
  ** linux/init.h **
  ******************/
@@ -179,7 +246,9 @@ struct module;
 #define module_exit(fn) void module_exit_##fn(void) { fn(); }
 
 void module_put(struct module *);
+void __module_get(struct module *module);
 int try_module_get(struct module *);
+
 
 /*******************
  ** asm/barrier.h **
@@ -189,6 +258,12 @@ int try_module_get(struct module *);
 #define smp_mb() mb()
 #define smp_rmb() mb()
 #define smp_wmb() mb()
+
+static inline void barrier() { asm volatile ("": : :"memory"); }
+
+#define smp_load_acquire(p)     *(p)
+#define smp_store_release(p, v) *(p) = v;
+#define smp_mb__before_atomic() mb()
 
 
 /*************************
@@ -207,93 +282,185 @@ int try_module_get(struct module *);
 #define CONFIG_DEFAULT_TCP_CONG "cubic"
 
 
-/*******************
- ** linux/types.h **
- *******************/
+/**********************
+ ** linux/compiler.h **
+ **********************/
 
-typedef uint32_t uint;
+#define likely
+#define unlikely
 
-typedef int8_t   s8;
-typedef int16_t  s16;
-typedef int32_t  s32;
-typedef int64_t  s64;
+#define __user
+#define __rcu
+#define __percpu
+#define __must_check
+#define __force
+#define __deprecated
 
-typedef uint8_t  u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef uint64_t u64;
+#define __releases(x)
+#define __acquires(x)
+
+#define __aligned(x)  __attribute__((aligned(x)))
+
+#define noinline_for_stack
+#define noinline     __attribute__((noinline))
+
+#define __printf(a, b) __attribute__((format(printf, a, b)))
+#define __attribute_const__  __attribute__((__const__))
+
+#define ACCESS_ONCE(x) (*(volatile typeof(x) *)&(x))
+
+static inline void __write_once_size(volatile void *p, void *res, int size)
+{
+	switch (size) {
+	case 1: *(volatile __u8  *)p = *(__u8  *)res; break;
+	case 2: *(volatile __u16 *)p = *(__u16 *)res; break;
+	case 4: *(volatile __u32 *)p = *(__u32 *)res; break;
+	case 8: *(volatile __u64 *)p = *(__u64 *)res; break;
+	default:
+		barrier();
+		__builtin_memcpy((void *)p, (const void *)res, size);
+		barrier();
+	}
+}
+
+#define WRITE_ONCE(x, val)                        \
+({                                                \
+	union { typeof(x) __val; char __c[1]; } __u = \
+	{ .__val = (__force typeof(x)) (val) };       \
+	__write_once_size(&(x), __u.__c, sizeof(x));  \
+	__u.__val;                                    \
+})
+
+static inline void __read_once_size(const volatile void *p, void *res, int size)
+{
+	switch (size) {
+	case 1: *(__u8  *)res = *(volatile __u8  *)p; break;
+	case 2: *(__u16 *)res = *(volatile __u16 *)p; break;
+	case 4: *(__u32 *)res = *(volatile __u32 *)p; break;
+	case 8: *(__u64 *)res = *(volatile __u64 *)p; break;
+	default:
+		barrier();
+		__builtin_memcpy((void *)res, (const void *)p, size);
+		barrier();
+	}
+}
+
+#define READ_ONCE(x) \
+({                                               \
+	union { typeof(x) __val; char __c[1]; } __u; \
+	__read_once_size(&(x), __u.__c, sizeof(x));  \
+	__u.__val;                                   \
+})
+
+#define __HAVE_BUILTIN_BSWAP32__
+#define __HAVE_BUILTIN_BSWAP64__
 
 
+/********************
+ ** linux/kernel.h **
+ ********************/
 
-typedef uint8_t  __u8;
-typedef uint16_t __u16;
-typedef uint32_t __u32;
-typedef uint64_t __u64;
+#define KERN_DEBUG  "DEBUG: "
+#define KERN_INFO   "INFO: "
+#define KERN_ERR    "ERROR: "
+#define KERN_CRIT   "CRTITCAL: "
+#define KERN_NOTICE "NOTICE: "
+#define KERN_EMERG  "EMERG: "
+#define KERN_ALERT  "ALERT: "
+#define KERN_CONT   ""
+#define KERN_WARN   "WARNING: "
 
-typedef __u8  u_int8_t;
+#define FIELD_SIZEOF(t, f) (sizeof(((t*)0)->f))
 
-typedef int16_t  __s16;
-typedef int32_t  __s32;
+#define container_of(ptr, type, member) ({ \
+	const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+	(type *)( (char *)__mptr - offsetof(type,member) );})
 
-typedef __u16 __le16;
-typedef __u32 __le32;
-typedef __u64 __le64;
+/* normally provided by linux/stddef.h, needed by linux/list.h */
+#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 
-typedef __u16 __be16;
-typedef __u32 __be32;
-typedef __u64 __be64;
+#define ALIGN(x, a) x
+#define PAGE_ALIGN(addr) ALIGN(addr, PAGE_SIZE)
+#define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
 
-typedef __u16 __sum16;
-typedef __u32 __wsum;
+#define SIZE_MAX (~(size_t)0)
 
-typedef unsigned       gfp_t;
-typedef unsigned long  dma_addr_t;
-typedef long long      loff_t;
-typedef size_t       __kernel_size_t;
-typedef long         __kernel_time_t;
-typedef long         __kernel_suseconds_t;
-typedef int            pid_t;
-typedef long           ssize_t;
-typedef unsigned short umode_t;
-typedef unsigned long  clock_t;
-typedef int            pid_t;
-typedef unsigned int   uid_t;
-typedef unsigned int   gid_t;
+#define USHRT_MAX ((u16)(~0U))
+#define INT_MAX   ((int)(~0U>>1))
+#define INT_MIN   (-INT_MAX - 1)
+#define UINT_MAX  (~0U)
+
+#define U32_MAX  ((u32)~0U)
+#define S32_MAX  ((s32)(U32_MAX>>1))
+#define S32_MIN  ((s32)(-S32_MAX - 1))
+
+static inline size_t min(size_t a, size_t b) {
+	return a < b ? a : b; }
+
+#define max(x, y) ({                      \
+	typeof(x) _max1 = (x);                  \
+	typeof(y) _max2 = (y);                  \
+	(void) (&_max1 == &_max2);              \
+	_max1 > _max2 ? _max1 : _max2; })
+
+#define min_t(type, x, y) ({ \
+	type __min1 = (x); \
+	type __min2 = (y); \
+	__min1 < __min2 ? __min1: __min2; })
+
+#define max_t(type, x, y) ({ \
+	type __max1 = (x); \
+	type __max2 = (y); \
+	__max1 > __max2 ? __max1: __max2; })
+
+#define swap(a, b) ({ \
+	typeof(a) __tmp = (a); \
+	(a) = (b); \
+	(b) = __tmp;  })
+
+#define PTR_ALIGN(p, a) ({              \
+  unsigned long _p = (unsigned long)p;  \
+  _p = (_p + a - 1) & ~(a - 1);         \
+  p = (typeof(p))_p;                    \
+	p;                                    \
+})
+
+#define BUILD_BUG_ON(condition)
+
+#define _RET_IP_  (unsigned long)__builtin_return_address(0)
+
+void might_sleep();
+#define might_sleep_if(cond) do { if (cond) might_sleep(); } while (0)
+
+enum { SPRINTF_STR_LEN = 64 };
+
+int   snprintf(char *buf, size_t size, const char *fmt, ...);
+int   sprintf(char *buf, const char *fmt, ...);
+int   sscanf(const char *, const char *, ...);
+int   kstrtoul(const char *, unsigned int, unsigned long *);
+int   scnprintf(char *, size_t, const char *, ...);
+
+#define sprintf(buf, fmt, ...) snprintf(buf, SPRINTF_STR_LEN, fmt, __VA_ARGS__)
+
+#define kasprintf(gfp, fmt, ...) ({ \
+	void *buf = kmalloc(SPRINTF_STR_LEN, 0); \
+	sprintf(buf, fmt, __VA_ARGS__); \
+	buf; \
+})
+
+#define clamp(val, lo, hi) min((typeof(val))max(val, lo), hi)
+
+//char *kasprintf(gfp_t gfp, const char *fmt, ...);
+
+char *get_options(const char *str, int nints, int *ints);
+int   hex_to_bin(char);
 
 
-#define __aligned_u64 __u64 __attribute__((aligned(8)))
+/*****************
+ ** asm/param.h **
+ *****************/
 
-#define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
-#define BITS_TO_LONGS(nr)       DIV_ROUND_UP(nr, 8 * sizeof(long))
-#define DECLARE_BITMAP(name,bits) \
-	unsigned long name[BITS_TO_LONGS(bits)]
-
-struct list_head {
-	struct list_head *next, *prev;
-};
-
-struct hlist_head {
-	struct hlist_node *first;
-};
-
-struct hlist_node {
-	struct hlist_node *next, **pprev;
-};
-
-#ifndef __cplusplus
-typedef _Bool bool;
-enum { true = 1, false = 0 };
-#endif /* __cplusplus */
-
-#ifndef NULL
-#ifdef __cplusplus
-#define NULL nullptr
-#else
-#define NULL ((void *)0)
-#endif /* __cplusplus */
-#endif /* NULL */
-
-#define __bitwise
+#define HZ 100UL
 
 
 /*********************
@@ -302,11 +469,17 @@ enum { true = 1, false = 0 };
 
 extern unsigned long jiffies;
 
-enum { INITIAL_JIFFIES = 0 };
+enum {
+	INITIAL_JIFFIES = 0,
+	JIFFIES_TICK_MS = 1000/HZ,
+	JIFFIES_TICK_US = 1000*1000/HZ,
+};
 
-unsigned int jiffies_to_msecs(const unsigned long);
-unsigned int jiffies_to_usecs(const unsigned long);
-unsigned long msecs_to_jiffies(const unsigned int);
+static inline unsigned int jiffies_to_msecs(const unsigned long j) { return j * JIFFIES_TICK_MS; }
+static inline unsigned int jiffies_to_usecs(const unsigned long j) { return j * JIFFIES_TICK_US; }
+
+static inline unsigned long msecs_to_jiffies(const unsigned int m) { return m / JIFFIES_TICK_MS; }
+static inline unsigned long usecs_to_jiffies(const unsigned int u) { return u / JIFFIES_TICK_US; }
 
 long time_after(long a, long b);
 long time_after_eq(long a, long b);
@@ -314,8 +487,17 @@ long time_after_eq(long a, long b);
 static inline long time_before(long a, long b) { return time_after(b, a); }
 static inline long time_before_eq(long a, long b) { return time_after_eq(b ,a); }
 
-clock_t jiffies_to_clock_t(unsigned long);
-void    update_jiffies(void);
+static inline clock_t jiffies_to_clock_t(unsigned long j)
+{
+	return j / HZ; /* XXX not sure if this is enough */
+}
+
+static inline clock_t jiffies_delta_to_clock_t(long delta)
+{
+	return jiffies_to_clock_t(max(0L, delta));
+}
+
+void update_jiffies(void);
 
 
 /******************
@@ -489,16 +671,12 @@ static inline u32 get_unaligned_be32(const void *p)
 	return be32_to_cpup((__be32 *)p);
 }
 
-u32 __get_unaligned_cpu32(const void *);
+static inline u32 __get_unaligned_cpu32(const void *p)
+{
+	return p;
+}
 
 void put_unaligned_be32(u32 val, void *);
-
-
-/*****************
- ** asm/param.h **
- *****************/
-
-#define HZ 100UL
 
 
 /*********************
@@ -507,98 +685,6 @@ void put_unaligned_be32(u32 val, void *);
 
 #define __stringify_1(x...) #x
 #define __stringify(x...)   __stringify_1(x)
-
-
-/********************
- ** linux/kernel.h **
- ********************/
-
-#define KERN_DEBUG  "DEBUG: "
-#define KERN_INFO   "INFO: "
-#define KERN_ERR    "ERROR: "
-#define KERN_CRIT   "CRTITCAL: "
-#define KERN_NOTICE "NOTICE: "
-#define KERN_EMERG  "EMERG: "
-#define KERN_ALERT  "ALERT: "
-#define KERN_CONT   ""
-#define KERN_WARN   "WARNING: "
-
-
-#define container_of(ptr, type, member) ({ \
-	const typeof( ((type *)0)->member ) *__mptr = (ptr); \
-	(type *)( (char *)__mptr - offsetof(type,member) );})
-
-/* normally provided by linux/stddef.h, needed by linux/list.h */
-#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
-
-#define ALIGN(x, a) x
-#define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
-
-#define USHRT_MAX ((u16)(~0U))
-#define INT_MAX   ((int)(~0U>>1))
-#define INT_MIN   (-INT_MAX - 1)
-#define UINT_MAX  (~0U)
-
-static inline size_t min(size_t a, size_t b) {
-	return a < b ? a : b; }
-
-#define max(x, y) ({                      \
-	typeof(x) _max1 = (x);                  \
-	typeof(y) _max2 = (y);                  \
-	(void) (&_max1 == &_max2);              \
-	_max1 > _max2 ? _max1 : _max2; })
-
-#define min_t(type, x, y) ({ \
-	type __min1 = (x); \
-	type __min2 = (y); \
-	__min1 < __min2 ? __min1: __min2; })
-
-#define max_t(type, x, y) ({ \
-	type __max1 = (x); \
-	type __max2 = (y); \
-	__max1 > __max2 ? __max1: __max2; })
-
-#define swap(a, b) ({ \
-	typeof(a) __tmp = (a); \
-	(a) = (b); \
-	(b) = __tmp;  })
-
-#define PTR_ALIGN(p, a) ({              \
-  unsigned long _p = (unsigned long)p;  \
-  _p = (_p + a - 1) & ~(a - 1);         \
-  p = (typeof(p))_p;                    \
-	p;                                    \
-})
-
-#define BUILD_BUG_ON(condition)
-
-#define _RET_IP_  (unsigned long)__builtin_return_address(0)
-
-void might_sleep();
-#define might_sleep_if(cond) do { if (cond) might_sleep(); } while (0)
-
-enum { SPRINTF_STR_LEN = 64 };
-
-int   snprintf(char *buf, size_t size, const char *fmt, ...);
-int   sprintf(char *buf, const char *fmt, ...);
-int   sscanf(const char *, const char *, ...);
-int   kstrtoul(const char *, unsigned int, unsigned long *);
-int   scnprintf(char *, size_t, const char *, ...);
-
-#define sprintf(buf, fmt, ...) snprintf(buf, SPRINTF_STR_LEN, fmt, __VA_ARGS__)
-
-#define kasprintf(gfp, fmt, ...) ({ \
-	void *buf = kmalloc(SPRINTF_STR_LEN, 0); \
-	sprintf(buf, fmt, __VA_ARGS__); \
-	buf; \
-})
-
-#define clamp(val, min, max) printk("clamp is not implemented\n")
-
-//char *kasprintf(gfp_t gfp, const char *fmt, ...);
-
-char *get_options(const char *str, int nints, int *ints);
-int   hex_to_bin(char);
 
 
 /**************************
@@ -621,7 +707,11 @@ struct sysinfo
 	prev;\
 })
 
-unsigned long __xchg(unsigned long, volatile void *, int);
+#define __xchg(v, ptr, s) ({ \
+	typeof(*ptr) prev = *ptr; \
+	*ptr = v; \
+	prev; \
+})
 
 #define xchg(ptr, x) \
 	((__typeof__(*(ptr))) __xchg((unsigned long)(x), (ptr), sizeof(*(ptr))))
@@ -652,6 +742,7 @@ static inline int  atomic_inc_return(atomic_t *p) { return p->counter++; }
 static inline int atomic_inc_not_zero(atomic_t *p) { return p->counter ? p->counter++ : 0; }
 
 static inline void atomic_add(int i, atomic_t *p) { p->counter += i; }
+static inline unsigned int  atomic_add_return(int i, atomic_t *p) { p->counter += i; return p->counter; }
 
 
 static inline void atomic_long_inc(atomic_long_t *p) { p->counter++; }
@@ -697,6 +788,8 @@ static inline int atomic_add_unless(atomic_t *v, int a, int u)
 }
 
 #define smp_mb__before_atomic_dec()
+
+#include <asm-generic/atomic64.h>
 
 /****************************
  ** tools/perf/util/util.h **
@@ -838,6 +931,13 @@ bool static_key_enabled(struct static_key *);
  ** linux/bitops.h, asm/bitops.h **
  **********************************/
 
+#define for_each_set_bit(bit, addr, size)                 \
+	for ((bit) = find_first_bit((addr), (size));          \
+		(bit) < (size);                                   \
+		(bit) = find_next_bit((addr), (size), (bit) + 1))
+
+#define BIT(nr) (1UL << (nr))
+
 enum { BITS_PER_LONG  = sizeof(long) * 8 };
 #define BIT_MASK(nr)  (1UL << ((nr) % BITS_PER_LONG))
 #define BIT_WORD(nr)  ((nr) / BITS_PER_LONG)
@@ -855,8 +955,12 @@ enum { BITS_PER_LONG  = sizeof(long) * 8 };
 
 #define smp_mb__before_clear_bit()
 
-unsigned long __fls(unsigned long);
-int           fls64(__u64 x);
+static inline unsigned long __fls(unsigned long word)
+{
+	return (sizeof(word) * 8) - 1 - __builtin_clzl(word);
+}
+
+int fls64(__u64 x);
 
 static int get_bitmask_order(unsigned int count) {
  return __builtin_clz(count) ^ 0x1f; }
@@ -903,6 +1007,8 @@ unsigned long ilog2(unsigned long n);
 #define roundup_pow_of_two(n) ( \
 	1UL << (ilog2((n) - 1) + 1))
 
+int rounddown_pow_of_two(u32 n);
+
 
 /****************
  ** asm/page.h **
@@ -912,6 +1018,7 @@ unsigned long ilog2(unsigned long n);
  * For now, hardcoded
  */
 #define PAGE_SIZE 4096
+#define PAGE_MASK (~(PAGE_SIZE-1))
 
 enum {
 	PAGE_SHIFT = 12,
@@ -939,15 +1046,94 @@ u64 res_counter_uncharge(struct res_counter *, unsigned long);
 u64 res_counter_read_u64(struct res_counter *counter, int member);
 
 
+/****************************
+ ** linux/percpu_counter.h **
+ ****************************/
+
+struct percpu_counter
+{
+	s64 count;
+};
+
+static inline int percpu_counter_init(struct percpu_counter *fbc, s64 amount, gfp_t gfp)
+{
+	fbc->count = amount;
+	return 0;
+}
+
+static inline s64 percpu_counter_read(struct percpu_counter *fbc)
+{
+	return fbc->count;
+}
+
+static inline
+void percpu_counter_add(struct percpu_counter *fbc, s64 amount)
+{
+	fbc->count += amount;
+}
+
+static inline
+void __percpu_counter_add(struct percpu_counter *fbc, s64 amount, s32 batch)
+{
+	percpu_counter_add(fbc, amount);
+}
+
+s64 percpu_counter_sum_positive(struct percpu_counter *fbc);
+
+static inline void percpu_counter_inc(struct percpu_counter *fbc)
+{
+	percpu_counter_add(fbc, 1);
+}
+
+static inline void percpu_counter_dec(struct percpu_counter *fbc)
+{
+	percpu_counter_add(fbc, -1);
+}
+
+static inline
+s64 percpu_counter_read_positive(struct percpu_counter *fbc)
+{
+	return fbc->count;
+}
+
+void percpu_counter_destroy(struct percpu_counter *fbc);
+
+
+/**************************
+ ** linux/page_counter.h **
+ **************************/
+
+struct page_counter
+{
+	atomic_long_t count;
+	unsigned long limit;
+};
+
+static inline unsigned long page_counter_read(struct page_counter *counter) {
+	return atomic_long_read(&counter->count); }
+
+void page_counter_charge(struct page_counter *counter, unsigned long nr_pages);
+void page_counter_uncharge(struct page_counter *counter, unsigned long nr_pages);
+
+
 /************************
  ** linux/memcontrol.h **
  ************************/
+
 struct sock;
 
 enum { UNDER_LIMIT, SOFT_LIMIT, OVER_LIMIT };
 
 void sock_update_memcg(struct sock *);
 void sock_release_memcg(struct sock *);
+
+struct cg_proto
+{
+	struct page_counter memory_allocated;
+	struct percpu_counter sockets_allocated;
+	int memory_pressure;
+	long sysctl_mem[3];
+};
 
 
 /*********************
@@ -961,17 +1147,24 @@ struct mem_cgroup;
  ** linux/mm-types.h **
  **********************/
 
-struct page_frag 
+struct page_frag
 {
 	struct page *page;
 	__u16        offset;
 	__u16        size;
 };
 
+struct page_frag_cache
+{
+	bool pfmemalloc;
+};
+
 
 /****************
  ** linux/mm.h **
  ****************/
+
+int is_vmalloc_addr(const void *x);
 
 extern unsigned long totalram_pages;
 extern unsigned long num_physpages;
@@ -987,11 +1180,14 @@ struct page *virt_to_page(const void *x);
 
 void si_meminfo(struct sysinfo *);
 
+bool page_is_pfmemalloc(struct page *page);
+
 
 /********************
  ** linux/mmzone.h **
  ********************/
 
+enum { PAGE_ALLOC_COSTLY_ORDER = 3u };
 
 int PageHighMem(struct page *);
 
@@ -1003,21 +1199,22 @@ int PageHighMem(struct page *);
 unsigned long nr_free_buffer_pages(void);
 
 
-
 /*****************
  ** linux/gfp.h **
  *****************/
 
 enum {
-	__GFP_DMA        = 0x01u,
-	__GFP_WAIT       = 0x10u,
-	__GFP_COLD       = 0x100u,
-	__GFP_NOWARN     = 0x200u,
-	__GFP_REPEAT     = 0x400u,
-	__GFP_MEMALLOC   = 0x2000u,
-	__GFP_ZERO       = 0x8000u,
-	__GFP_COMP       = 0x4000u,
-	__GFP_NOMEMALLOC = 0x10000u,
+	__GFP_DMA            = 0x00000001u,
+	__GFP_WAIT           = 0x00000010u,
+	__GFP_COLD           = 0x00000100u,
+	__GFP_NOWARN         = 0x00000200u,
+	__GFP_REPEAT         = 0x00000400u,
+	__GFP_NORETRY        = 0x00001000u,
+	__GFP_MEMALLOC       = 0x00002000u,
+	__GFP_ZERO           = 0x00008000u,
+	__GFP_COMP           = 0x00004000u,
+	__GFP_NOMEMALLOC     = 0x00010000u,
+	__GFP_DIRECT_RECLAIM = 0x00400000u,
 };
 
 enum {
@@ -1040,6 +1237,11 @@ unsigned long get_zeroed_page(gfp_t gfp_mask);
 bool gfp_pfmemalloc_allowed(gfp_t);
 unsigned long __get_free_pages(gfp_t, unsigned int);
 void free_pages(unsigned long, unsigned int);
+void __free_page_frag(void *addr);
+bool gfpflags_allow_blocking(const gfp_t gfp_flags);
+
+void *__alloc_page_frag(struct page_frag_cache *nc, unsigned int fragsz, gfp_t gfp_mask);
+
 
 /******************
  ** linux/slab.h **
@@ -1054,12 +1256,14 @@ enum {
 };
 
 void *kmalloc(size_t size, gfp_t flags);
+void *kmalloc_array(size_t n, size_t size, gfp_t flags);
 void *kzalloc(size_t size, gfp_t flags);
 void *kcalloc(size_t n, size_t size, gfp_t flags);
 void *krealloc(const void *, size_t, gfp_t);
 void *kzalloc_node(size_t size, gfp_t flags, int node);
 void *kmalloc_node_track_caller(size_t size, gfp_t flags, int node);
 void  kfree(const void *);
+void  kvfree(const void *);
 size_t ksize(const void *objp);
 
 struct kmem_cache;
@@ -1077,6 +1281,7 @@ void kmem_cache_destroy(struct kmem_cache *);
  ** linux/vmalloc.h **
  *********************/
 
+void *vmalloc(unsigned long size);
 void *vzalloc(unsigned long size);
 void vfree(const void *addr);
 
@@ -1213,9 +1418,12 @@ struct timespec {
 };
 
 enum {
+	CLOCK_MONOTONIC = 1,
+
 	MSEC_PER_SEC  = 1000L,
 	USEC_PER_SEC  = MSEC_PER_SEC * 1000L,
 	NSEC_PER_MSEC = 1000L * 1000L,
+	NSEC_PER_USEC = NSEC_PER_MSEC * 1000L,
 	NSEC_PER_SEC  = MSEC_PER_SEC * NSEC_PER_MSEC,
 	USEC,
 	USEC_PER_MSEC = 1000L,
@@ -1229,8 +1437,8 @@ void          getnstimeofday(struct timespec *);
  ** linux/ktime.h **
  *******************/
 
-union ktime { 
-	s64 tv64; 
+union ktime {
+	s64 tv64;
 };
 
 typedef union ktime ktime_t;
@@ -1301,7 +1509,17 @@ unsigned long round_jiffies_up(unsigned long);
  ** linux/hrtimer.h **
  *********************/
 
-struct hrtimer { };
+enum hrtimer_restart
+{
+	HRTIMER_NORESTART,
+
+	HRTIMER_MODE_REL_PINNED = 0x03,
+};
+
+struct hrtimer
+{
+	enum hrtimer_restart (*function)(struct hrtimer *);
+};
 
 
 /*******************
@@ -1378,6 +1596,8 @@ void __set_current_state(int);
 void  set_current_state(int);
 pid_t task_tgid_vnr(struct task_struct *);
 
+u64 local_clock(void);
+
 
 /************************
  ** linux/textsearch.h **
@@ -1429,7 +1649,7 @@ enum {
 #define lockdep_set_class(lock, key)
 #define lockdep_set_class_and_name(lock, key, name)
 #define mutex_acquire(l, s, t, i)
-#define mutex_release(l, n, i) 
+#define mutex_release(l, n, i)
 
 struct lock_class_key { };
 struct lockdep_map { };
@@ -1442,6 +1662,7 @@ void lockdep_init_map(struct lockdep_map *, const char *,
  ** linux/smp.h **
  *****************/
 
+#define raw_smp_processor_id() 0
 #define smp_processor_id() 0
 #define put_cpu()
 
@@ -1453,7 +1674,7 @@ int on_each_cpu(smp_call_func_t, void *, int);
  ** linux/rcupdate.h **
  **********************/
 
-struct rcu_head { };
+// struct rcu_head { };
 
 #define kfree_rcu(ptr, offset) kfree(ptr)
 
@@ -1489,6 +1710,8 @@ static inline void call_rcu(struct rcu_head *head,
  ** linux/rculist.h **
  *********************/
 
+#define hlist_first_rcu(head) (*((struct hlist_node **)(&(head)->first)))
+
 #define hlist_for_each_entry_rcu(pos, head, member) \
 	hlist_for_each_entry(pos, head, member)
 
@@ -1506,6 +1729,8 @@ static inline void call_rcu(struct rcu_head *head,
 #define list_add_rcu       list_add
 #define list_add_tail_rcu  list_add_tail
 #define hlist_add_head_rcu hlist_add_head
+
+#define list_entry_rcu(ptr, type, member) container_of(ptr, type, member)
 
 #define list_del_rcu  list_del
 #define hlist_del_rcu hlist_del
@@ -1532,8 +1757,21 @@ void list_replace_rcu(struct list_head *, struct list_head *);
  ** linux/rcutree.h **
  *********************/
 
- void rcu_barrier(void);
- void synchronize_rcu_expedited(void);
+void rcu_barrier(void);
+void synchronize_rcu_expedited(void);
+
+
+/***********************
+ ** linux/hashtable.h **
+ ***********************/
+
+#define HASH_SIZE(name) (ARRAY_SIZE(name))
+
+#define HLIST_HEAD_INIT { .first = NULL }
+
+#define DEFINE_HASHTABLE(name, bits)                        \
+	struct hlist_head name[1 << (bits)] =                   \
+		{ [0 ... ((1 << (bits)) - 1)] = HLIST_HEAD_INIT }
 
 
 /*************************
@@ -1541,6 +1779,9 @@ void list_replace_rcu(struct list_head *, struct list_head *);
  *************************/
 
 #define DECLARE_PER_CPU_ALIGNED(type, name) \
+	extern typeof(type) name
+
+#define DECLARE_PER_CPU(type, name) \
 	extern typeof(type) name
 
 #define DEFINE_PER_CPU_ALIGNED(type, name) \
@@ -1557,6 +1798,10 @@ void list_replace_rcu(struct list_head *, struct list_head *);
 
 void *__alloc_percpu(size_t size, size_t align);
 
+#define __alloc_percpu_gfp(type, align, gfp) alloc_percpu(type)
+
+#define alloc_percpu_gfp(type, gfp) __alloc_percpu_gfp(type, 0, gfp)
+
 #define alloc_percpu(type)      \
         (typeof(type) __percpu *)__alloc_percpu(sizeof(type), __alignof__(type))
 
@@ -1568,6 +1813,7 @@ void *__alloc_percpu(size_t size, size_t align);
 #define __this_cpu_ptr(ptr) per_cpu_ptr(ptr, 0)
 #define this_cpu_ptr(ptr) per_cpu_ptr(ptr, 0)
 #define __this_cpu_read(pcp) pcp
+#define this_cpu_read(pcp) __this_cpu_read(pcp)
 
 #define this_cpu_inc(pcp) pcp += 1
 #define this_cpu_dec(pcp) pcp -= 1
@@ -1579,6 +1825,8 @@ void *__alloc_percpu(size_t size, size_t align);
 #define __this_cpu_add(pcp, val) this_cpu_add(pcp, val)
 #define get_cpu() 0
 
+#define raw_cpu_ptr(ptr) per_cpu_ptr(ptr, 0)
+#define raw_cpu_inc(pcp) pcp += 1
 
 /*********************
  ** linux/cpumask.h **
@@ -1588,58 +1836,6 @@ void *__alloc_percpu(size_t size, size_t align);
 
 unsigned num_possible_cpus(void);
 
-
-/****************************
- ** linux/percpu_counter.h **
- ****************************/
-
-struct percpu_counter
-{
-	s64 count;
-};
-
-static inline int percpu_counter_init(struct percpu_counter *fbc, s64 amount)
-{
-	fbc->count = amount;
-	return 0;
-}
-
-static inline s64 percpu_counter_read(struct percpu_counter *fbc)
-{
-	return fbc->count;
-}
-
-static inline
-void percpu_counter_add(struct percpu_counter *fbc, s64 amount)
-{
-	fbc->count += amount;
-}
-
-static inline
-void __percpu_counter_add(struct percpu_counter *fbc, s64 amount, s32 batch)
-{
-	percpu_counter_add(fbc, amount);
-}
-
-s64 percpu_counter_sum_positive(struct percpu_counter *fbc);
-
-static inline void percpu_counter_inc(struct percpu_counter *fbc)
-{
-	percpu_counter_add(fbc, 1);
-}
-
-static inline void percpu_counter_dec(struct percpu_counter *fbc)
-{
-	percpu_counter_add(fbc, -1);
-}
-
-static inline
-s64 percpu_counter_read_positive(struct percpu_counter *fbc)
-{
-	return fbc->count;
-}
-
-void percpu_counter_destroy(struct percpu_counter *fbc);
 
 /*****************
  ** linux/cpu.h **
@@ -1822,6 +2018,7 @@ void set_fs(mm_segment_t);
 
 enum {
 	CAP_NET_BIND_SERVICE = 10,
+	CAP_NET_BROADCAST    = 11,
 	CAP_NET_ADMIN        = 12,
 	CAP_NET_RAW          = 13,
 };
@@ -1955,6 +2152,8 @@ struct phy_device;
 struct phy_driver
 {
 	int (*ts_info)(struct phy_device *phydev, struct ethtool_ts_info *ti);
+	int (*module_info)(struct phy_device *dev, struct ethtool_modinfo *modinfo);
+	int (*module_eeprom)(struct phy_device *dev, struct ethtool_eeprom *ee, u8 *data);
 };
 
 struct phy_device
@@ -2149,6 +2348,8 @@ void *generic_pipe_buf_map(struct pipe_inode_info *, struct pipe_buffer *, int);
 void  generic_pipe_buf_unmap(struct pipe_inode_info *, struct pipe_buffer *, void *);
 int   generic_pipe_buf_confirm(struct pipe_inode_info *, struct pipe_buffer *);
 
+extern const struct pipe_buf_operations nosteal_pipe_buf_ops;
+
 
 /********************
  ** linux/splice.h **
@@ -2204,6 +2405,34 @@ struct kvec
 };
 
 int memcpy_toiovec(struct iovec *iov, unsigned char *kdata, int len);
+
+struct iov_iter {
+	int type;
+	size_t iov_offset;
+	size_t count;
+	union {
+		const struct iovec *iov;
+		const struct kvec *kvec;
+		const struct bio_vec *bvec;
+	};
+	unsigned long nr_segs;
+};
+
+static inline size_t iov_iter_count(struct iov_iter *i) { return i->count; }
+
+size_t copy_to_iter(void *addr, size_t bytes, struct iov_iter *i);
+size_t copy_from_iter(void *addr, size_t bytes, struct iov_iter *i);
+size_t copy_from_iter_nocache(void *addr, size_t bytes, struct iov_iter *i);
+
+size_t copy_page_to_iter(struct page *page, size_t offset, size_t bytes, struct iov_iter *i);
+size_t copy_page_from_iter(struct page *page, size_t offset, size_t bytes, struct iov_iter *i);
+
+void iov_iter_advance(struct iov_iter *i, size_t bytes);
+ssize_t iov_iter_get_pages(struct iov_iter *i, struct page **pages,
+                           size_t maxsize, unsigned maxpages, size_t *start);
+
+size_t csum_and_copy_to_iter(void *addr, size_t bytes, __wsum *csum, struct iov_iter *i);
+size_t csum_and_copy_from_iter(void *addr, size_t bytes, __wsum *csum, struct iov_iter *i);
 
 
 /*******************************
@@ -2302,9 +2531,11 @@ struct delayed_work
 	.func = (f) \
 }
 
-#define INIT_WORK(_work, _func) printk("INIT_WORK not implemented\n");
+#define INIT_WORK(_work, _func) \
+	printk("%s:%d: INIT_WORK not implemented from: %p\n", __func__, __LINE__, __builtin_return_address(0));
 
 extern struct workqueue_struct *system_wq;
+#define system_power_efficient_wq 0
 
 bool schedule_work(struct work_struct *work);
 bool schedule_delayed_work(struct delayed_work *, unsigned long);
@@ -2381,6 +2612,74 @@ int  rtnl_is_locked(void);
 int  rtnl_put_cacheinfo(struct sk_buff *, struct dst_entry *, u32, long, u32);
 
 
+/***********************
+ ** linux/genetlink.h **
+ ***********************/
+
+extern atomic_t genl_sk_destructing_cnt;
+
+/*********************
+ ** net/flow_keys.h **
+ *********************/
+
+enum flow_dissector_key_id
+{
+	FLOW_DISSECTOR_KEY_IPV4_ADDRS,
+};
+
+struct flow_dissector_key_control
+{
+	u16 thoff;
+	u16 addr_type;
+	u32 flags;
+};
+
+struct flow_dissector_key_ipv4_addrs {
+	/* (src,dst) must be grouped, in the same way than in IP header */
+	__be32 src;
+	__be32 dst;
+};
+
+struct flow_dissector_key_addrs {
+	union {
+		struct flow_dissector_key_ipv4_addrs v4addrs;
+		// struct flow_dissector_key_ipv6_addrs v6addrs;
+		// struct flow_dissector_key_tipc_addrs tipcaddrs;
+	};
+};
+
+struct flow_keys
+{
+	/* (src,dst) must be grouped, in the same way than in IP header */
+	__be32 src;
+	__be32 dst;
+	union {
+		__be32 ports;
+		__be16 port16[2];
+	};
+	u16 thoff;
+	u8 ip_proto;
+
+	struct flow_dissector_key_control control;
+	struct flow_dissector_key_addrs   addrs;
+};
+
+struct flow_dissector_key
+{
+	unsigned dummy;
+};
+
+struct flow_dissector
+{
+	unsigned dummy;
+};
+
+extern struct flow_dissector flow_keys_dissector;
+extern struct flow_dissector flow_keys_buf_dissector;
+
+bool flow_keys_have_l4(struct flow_keys *keys);
+
+
 /********************
  ** net/netevent.h **
  ********************/
@@ -2417,7 +2716,11 @@ void scm_destroy(struct scm_cookie *);
  ** net/fib_rules.h **
  *********************/
 
-enum { FIB_LOOKUP_NOREF = 1 };
+enum
+{
+	FIB_LOOKUP_NOREF            = 1,
+	FIB_LOOKUP_IGNORE_LINKSTATE = 2,
+};
 
 
 /****************************
@@ -2425,6 +2728,23 @@ enum { FIB_LOOKUP_NOREF = 1 };
  ****************************/
 
 struct u64_stats_sync { };
+
+void u64_stats_init(struct u64_stats_sync *syncp);
+void u64_stats_update_begin(struct u64_stats_sync *syncp);
+void u64_stats_update_end(struct u64_stats_sync *syncp);
+
+unsigned int u64_stats_fetch_begin_irq(const struct u64_stats_sync *p);
+bool u64_stats_fetch_retry_irq(const struct u64_stats_sync *p, unsigned int s);
+
+
+/**********************
+ ** net/netns/core.h **
+ **********************/
+
+struct netns_core
+{
+	int sysctl_somaxconn;
+};
 
 
 /*************************
@@ -2455,14 +2775,16 @@ struct net
 	struct hlist_head       *dev_index_head;
 	unsigned int             dev_base_seq;
 	int                      ifindex;
+	unsigned int             dev_unreg_count;
 	struct net_device       *loopback_dev;
+	struct netns_core        core;
 	struct user_namespace   *user_ns;
 	struct proc_dir_entry   *proc_net_stat;
 	struct sock             *rtnl;
 	struct netns_mib         mib;
 	struct netns_ipv4        ipv4;
 	atomic_t                 rt_genid;
-
+	atomic_t                 fnhe_genid;
 };
 
 
@@ -2491,6 +2813,8 @@ static inline void put_net(struct net *net) { }
 static inline int net_eq(const struct net *net1, const struct net *net2) {
 	return net1 == net2; }
 
+typedef struct { unsigned dummy; } possible_net_t;
+
 struct net *get_net_ns_by_pid(pid_t pid);
 struct net *get_net_ns_by_fd(int pid);
 
@@ -2500,6 +2824,8 @@ void release_net(struct net *net);
 
 int  rt_genid(struct net *);
 void rt_genid_bump(struct net *);
+
+int peernet2id(struct net *net, struct net *peer);
 
 
 /**************************
@@ -2662,7 +2988,7 @@ __sum16 csum_tcpudp_magic(__be32 saddr, __be32 daddr, unsigned short len,
 	return csum_fold(csum_tcpudp_nofold(saddr, daddr, len, proto, sum));
 }
 
-static inline 
+static inline
 __wsum csum_and_copy_to_user(const void *src, void __user *dst, int len,
                              __wsum sum, int *err_ptr)
 {
@@ -2672,16 +2998,22 @@ __wsum csum_and_copy_to_user(const void *src, void __user *dst, int len,
 	return sum;
 }
 
+__wsum remcsum_adjust(void *ptr, __wsum csum, int start, int offset);
+
 
 /*********************
  ** linux/if_vlan.h **
  *********************/
 
-enum { VLAN_HLEN = 4 };
+enum {
+	VLAN_HLEN     =  4,
+	VLAN_ETH_HLEN = 18,
+};
 
 struct vlan_hdr
 {
-	__be16  h_vlan_encapsulated_proto;
+	__be16 h_vlan_TCI;
+	__be16 h_vlan_encapsulated_proto;
 };
 
 struct vlan_ethhdr
@@ -2692,7 +3024,7 @@ struct vlan_ethhdr
 static inline
 struct net_device *vlan_dev_real_dev(const struct net_device *dev)
 {
-	return NULL; 
+	return NULL;
 }
 
 #define vlan_tx_tag_get(__skb) 0
@@ -2702,6 +3034,15 @@ int             is_vlan_dev(struct net_device *);
 u16             vlan_tx_tag_present(struct sk_buff *);
 bool            vlan_do_receive(struct sk_buff **);
 bool            vlan_tx_nonzero_tag_present(struct sk_buff *);
+
+
+/*****************************
+ ** uapi/linux/if_bonding.h **
+ *****************************/
+
+typedef struct ifbond { unsigned dummy; } ifbond;
+
+typedef struct ifslave { unsigned dummy; } ifslave;
 
 
 /********************
@@ -2718,7 +3059,17 @@ __wsum csum_block_sub(__wsum, __wsum, int);
 __wsum csum_sub(__wsum csum, __wsum addend);
 __wsum csum_unfold(__sum16 n);
 
+static inline __wsum csum_partial_ext(const void *buff, int len, __wsum sum)
+{
+	return csum_partial(buff, len, sum);
+}
+
+__wsum csum_block_add_ext(__wsum csum, __wsum csum2, int offset, int len);
+
 void csum_replace2(__sum16 *, __be16, __be16);
+
+static inline void remcsum_unadjust(__sum16 *psum, __wsum delta) {
+	*psum = csum_fold(csum_sub(delta, *psum)); }
 
 
 /*****************************
@@ -2734,8 +3085,12 @@ enum {
 	SOF_TIMESTAMPING_RX_HARDWARE  = 1 << 2,
 	SOF_TIMESTAMPING_RX_SOFTWARE  = 1 << 3,
 	SOF_TIMESTAMPING_SOFTWARE     = 1 << 4,
-	SOF_TIMESTAMPING_SYS_HARDWARE =  1 << 5,
-	SOF_TIMESTAMPING_RAW_HARDWARE =  1 << 6,
+	SOF_TIMESTAMPING_SYS_HARDWARE = 1 << 5,
+	SOF_TIMESTAMPING_RAW_HARDWARE = 1 << 6,
+	SOF_TIMESTAMPING_OPT_ID       = 1 << 7,
+	SOF_TIMESTAMPING_TX_ACK       = 1 << 9,
+	SOF_TIMESTAMPING_OPT_CMSG     = 1 << 10,
+	SOF_TIMESTAMPING_OPT_TSONLY   = 1 << 11,
 	SOF_TIMESTAMPING_MASK = (SOF_TIMESTAMPING_RAW_HARDWARE - 1) |
 	                         SOF_TIMESTAMPING_RAW_HARDWARE,
 };
@@ -2793,7 +3148,7 @@ typedef u16 (*rtnl_calcit_func)(struct sk_buff *, struct nlmsghdr *);
 
 extern const struct nla_policy ifla_policy[IFLA_MAX+1];
 
-void rtmsg_ifinfo(int type, struct net_device *dev, unsigned change);
+void rtmsg_ifinfo(int type, struct net_device *dev, unsigned change, gfp_t flags);
 
 
 /**********************
@@ -2815,6 +3170,44 @@ enum {
 extern int sysctl_tcp_fastopen;
 
 
+/**********************
+ ** net/ip_tunnels.h **
+ **********************/
+
+enum
+{
+	IP_TUNNEL_INFO_TX   = 0x01,
+	IP_TUNNEL_INFO_IPV6 = 0x02,
+};
+
+struct ip_tunnel_key {
+	__be64          tun_id;
+	union {
+		struct {
+			__be32  src;
+			__be32  dst;
+		} ipv4;
+		struct {
+			struct in6_addr src;
+			struct in6_addr dst;
+		} ipv6;
+	} u;
+	__be16          tun_flags;
+	u8          tos;        /* TOS for IPv4, TC for IPv6 */
+	u8          ttl;        /* TTL for IPv4, HL for IPv6 */
+	__be16          tp_src;
+	__be16          tp_dst;
+};
+
+struct ip_tunnel_info
+{
+	struct ip_tunnel_key key;
+
+	u8 options_len;
+	u8 mode;
+};
+
+
 /********************************
  ** uapi/asm-generic/sockios.h **
  ********************************/
@@ -2830,16 +3223,76 @@ enum {
  ** net/cls_cgroup.h **
  **********************/
 
-void sock_update_classid(struct sock *, struct task_struct *);
+void sock_update_classid(struct sock *);
 
 
 /****************
  ** linux/ip.h **
  ****************/
 
+#include <uapi/linux/ip.h>
+
 struct ip_hdr;
 
 struct iphdr *ip_hdr(const struct sk_buff *skb);
+
+
+/*************************
+ ** uapi/linux/icmpv6.h **
+ *************************/
+
+enum
+{
+	ICMPV6_ECHO_REQUEST = 128,
+};
+
+
+struct icmp6hdr
+{
+	__u8 icmp6_type;
+	__u8 icmp6_code;
+};
+
+
+/********************
+ ** linux/icmpv6.h **
+ ********************/
+
+struct icmp6hdr *icmp6_hdr(const struct sk_buff *skb);
+
+
+/***********************
+ ** uapi/linux/ipv6.h **
+ ***********************/
+
+struct ipv6hdr
+{
+	__u8 priority:4, version:4;
+	__be16              payload_len;
+	__u8                hop_limit;
+	__u8                nexthdr;
+	struct  in6_addr    saddr;
+	struct  in6_addr    daddr;
+};
+
+struct ipv6_opt_hdr
+{
+	__u8 nexthdr;
+	__u8 hdrlen;
+} __attribute__((packed));
+
+struct frag_hdr
+{
+	__u8    nexthdr;
+	/* __u8    reserved; */
+	__be16  frag_off;
+	/* __be32  identification; */
+};
+
+
+static inline __u8 ipv6_get_dsfield(const struct ipv6hdr *ipv6h);
+
+struct ipv6hdr *ipv6_hdr(const struct sk_buff *skb);
 
 
 /********************************
@@ -2850,6 +3303,37 @@ enum {
 	NF_ARP_IN  = 0,
 	NF_ARP_OUT = 1,
 };
+
+
+/***************************
+ ** uapi/linux/lwtunnel.h **
+ ***************************/
+
+enum lwtunnel_encap_types
+{
+	LWTUNNEL_ENCAP_NONE,
+};
+
+
+/********************
+ ** net/lwtunnel.h **
+ ********************/
+
+struct lwtunnel_state
+{
+	int (*orig_output)(struct net *net, struct sock *sk, struct sk_buff *skb);
+	int (*orig_input)(struct sk_buff *);
+};
+
+static inline int lwtunnel_output(struct net *net, struct sock *sk, struct sk_buff *skb)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline int lwtunnel_input(struct sk_buff *skb)
+{
+	return -EOPNOTSUPP;
+}
 
 
 /****************
@@ -2906,7 +3390,7 @@ struct sec_path
 	struct xfrm_state *xvec[XFRM_MAX_DEPTH];
 };
 
-int  xfrm_sk_clone_policy(struct sock *);
+int  xfrm_sk_clone_policy(struct sock *, const struct sock *osk);
 int  xfrm_decode_session_reverse(struct sk_buff *, struct flowi *,
                                  unsigned int);
 void xfrm_sk_free_policy(struct sock *);
@@ -3005,6 +3489,7 @@ struct inet_diag_handler
 	                       struct inet_diag_msg *r,
 	                       void *info);
 	__u16                  idiag_type;
+	__u16                  idiag_info_size;
 };
 
 
@@ -3064,11 +3549,13 @@ extern const struct header_ops eth_header_ops;
  ** linux/netfilter.h **
  ***********************/
 
-#define NF_HOOK(pf, hook, skb, indev, outdev, okfn) (okfn)(skb)
-#define NF_HOOK_COND(pf, hook, skb, indev, outdev, okfn, cond) (okfn)(skb)
+#define NF_HOOK(pf, hook, net, sk, skb, indev, outdev, okfn) (okfn)(net, sk, skb)
+#define NF_HOOK_COND(pf, hook, net, sk, skb, indev, outdev, okfn, cond) (okfn)(net, sk, skb)
 
-int  nf_hook(u_int8_t, unsigned int, struct sk_buff *, struct net_device *,
-             struct net_device *, int (*)(struct sk_buff *));
+int nf_hook(u_int8_t pf, unsigned int hook, struct net *net,
+            struct sock *sk, struct sk_buff *skb,
+            struct net_device *indev, struct net_device *outdev,
+            int (*okfn)(struct net *, struct sock *, struct sk_buff *));
 void nf_ct_attach(struct sk_buff *, struct sk_buff *);
 
 
@@ -3113,7 +3600,25 @@ static inline bool ipv4_is_loopback(__be32 addr)
 #define MAC_FMT "%02x:%02x:%02x:%02x:%02x:%02x"
 #define MAC_ARG(x) x[0], x[1], x[2], x[3], x[4], x[5]
 
+#define __UAPI_DEF_IPPROTO_V6 1
+#define __UAPI_DEF_IN6_ADDR 1
 #include <uapi/linux/in6.h>
+#undef __UAPI_DEF_IN6_ADDR
+#undef __UAPI_DEF_IPPROTO_V6
+
+#define __UAPI_DEF_IN_IPPROTO 1
+#define __UAPI_DEF_IN_ADDR 1
+#define __UAPI_DEF_SOCKADDR_IN 1
+#define __UAPI_DEF_IN_CLASS 1
+#define __UAPI_DEF_IP_MREQ 1
+#define __UAPI_DEF_IN_PKTINFO 1
+#include <uapi/linux/in.h>
+#undef __UAPI_DEF_IN_PKTINFO
+#undef __UAPI_DEF_IP_MREQ
+#undef __UAPI_DEF_IN_CLASS
+#undef __UAPI_DEF_SOCKADDR_IN
+#undef __UAPI_DEF_IN_IPPROTO
+#undef __UAPI_DEF_IN_ADDR
 
 
 /********************
@@ -3128,6 +3633,18 @@ static inline void get_random_bytes(void *buf, int nbytes)
 	int i;
 	for (i = 0; i < nbytes; ++i)
 		b[i] = i + 1;
+}
+
+static inline void get_random_once(void *buf, int nbytes)
+{
+	return get_random_bytes(buf, nbytes);
+}
+
+static inline u32 prandom_u32(void) { return 4; /* fair dice roll */ }
+
+static inline void prandom_bytes(void *buf, size_t nbytes)
+{
+	get_random_bytes(buf, nbytes);
 }
 
 u32  random32(void);
@@ -3163,22 +3680,43 @@ int  security_netlink_send(struct sock *, struct sk_buff *);
  ** net/netns/hash.h **
  **********************/
 
-unsigned int net_hash_mix(struct net *);
+unsigned int net_hash_mix(struct net const *);
 
 
 /**************************
  ** net/netprio_cgroup.h **
  **************************/
 
-void sock_update_netprioidx(struct sock *, struct task_struct *);
+void sock_update_netprioidx(struct sock *);
+
+
+/****************
+ ** net/ipv6.h **
+ ****************/
+
+enum {
+	IP6_MF     = 0x0001,
+	IP6_OFFSET = 0xfff8,
+};
 
 
 /******************
  ** linux/ipv6.h **
  ******************/
 
+struct inet6_skb_parm { unsigned dummy; };
+
 int inet_v6_ipv6only(const struct sock *);
 int ipv6_only_sock(const struct sock *);
+
+#define ipv6_optlen(p)  (((p)->hdrlen+1) << 3)
+#define ipv6_authlen(p) (((p)->hdrlen+2) << 2)
+
+/* XXX not the sanest thing to do... */
+struct ipv6_pinfo {
+	__u16           recverr:1;
+};
+static inline struct ipv6_pinfo * inet6_sk(const struct sock *__sk) { return NULL; }
 
 
 /********************
@@ -3214,11 +3752,26 @@ bool S_ISSOCK(int);
  ** net/gen_stats.h **
  *********************/
 
+struct gnet_stats_basic_cpu {
+	unsigned bstats; /* normally gnet_stats_basic_packed */
+	unsigned syncp;  /* normally u64_stats_sync */
+};
+
 struct gnet_stats_basic_packed;
 struct gnet_stats_rate_est;
 
 void gen_kill_estimator(struct gnet_stats_basic_packed *,
                         struct gnet_stats_rate_est *);
+
+
+/*******************
+ ** linux/sysfs.h **
+ *******************/
+
+struct attribute {
+	const char *name;
+	mode_t      mode;
+};
 
 
 /*******************

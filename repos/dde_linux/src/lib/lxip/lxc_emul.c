@@ -11,67 +11,33 @@
  * under the terms of the GNU General Public License version 2.
  */
 #include <linux/netdevice.h>
-#include <net/ip_fib.h>
 #include <uapi/linux/rtnetlink.h>
 #include <net/sock.h>
 #include <net/route.h>
+#include <net/ip_fib.h>
 #include <net/tcp.h>
 
 
-/********************
- ** linux/slab.h   **
- ********************/
+/***********************
+ ** linux/genetlink.h **
+ ***********************/
 
-struct kmem_cache
+atomic_t genl_sk_destructing_cnt; /* needed by af_netlink.c */
+
+
+/****************************
+ ** asm-generic/atomic64.h **
+ ****************************/
+
+long long atomic64_read(const atomic64_t *v)
 {
-	const char *name;  /* cache name */
-	unsigned    size;  /* object size */
-};
-
-
-struct kmem_cache *kmem_cache_create(const char *name, size_t size, size_t align,
-                                     unsigned long falgs, void (*ctor)(void *))
-{
-	lx_log(DEBUG_SLAB, "\"%s\" obj_size=%zd", name, size);
-
-	struct kmem_cache *cache;
-
-	if (!name) {
-		pr_info("kmem_cache name required\n");
-		return 0;
-	}
-
-	cache = (struct kmem_cache *)kmalloc(sizeof(*cache), 0);
-	if (!cache) {
-		pr_crit("No memory for slab cache\n");
-		return 0;
-	}
-
-	cache->name = name;
-	cache->size = size;
-
-	return cache;
+	return v->counter;
 }
 
 
-void *kmem_cache_alloc_node(struct kmem_cache *cache, gfp_t flags, int node)
+void atomic64_set(atomic64_t *v, long long i)
 {
-	lx_log(DEBUG_SLAB, "\"%s\" alloc obj_size=%u",  cache->name,cache->size);
-	return kmalloc(cache->size, 0);
-}
-
-
-void *kmem_cache_alloc(struct kmem_cache *cache, gfp_t flags)
-{
-	lx_log(DEBUG_SLAB, "\"%s\" alloc obj_size=%u",  cache->name,cache->size);
-	return kmalloc(cache->size, 0);
-}
-
-
-void kmem_cache_free(struct kmem_cache *cache, void *objp)
-{
-	lx_log(DEBUG_SLAB, "\"%s\" (%p)", cache->name, objp);
-	kfree(objp);
+	v->counter = i;
 }
 
 
@@ -194,16 +160,6 @@ struct iphdr *ip_hdr(const struct sk_buff *skb)
 {
 	return (struct iphdr *)skb_network_header(skb);
 }
-
-
-/***********************
- ** linux/netdevice.h **
- ***********************/
-
- struct netdev_queue *netdev_pick_tx(struct net_device *dev, struct sk_buff *skb)
- {
- 	return netdev_get_tx_queue(dev, 0); 
- }
 
 
 /*******************************

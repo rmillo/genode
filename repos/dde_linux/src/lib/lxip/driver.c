@@ -22,7 +22,6 @@ static struct net_device *_dev;
 
 static int driver_net_open(struct net_device *dev)
 {
-	printk("%s called\n",__func__);
 	_dev = dev;
 	return 0;
 }
@@ -119,5 +118,3 @@ out:
 }
 
 module_init(driver_init);
-
-

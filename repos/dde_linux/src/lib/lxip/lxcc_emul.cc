@@ -11,6 +11,7 @@
  * under the terms of the GNU General Public License version 2.
  */
 #include <base/allocator_avl.h>
+#include <base/sleep.h>
 #include <base/snprintf.h>
 #include <dataspace/client.h>
 #include <rm_session/connection.h>
@@ -152,22 +153,44 @@ class Genode::Slab_alloc : public Genode::Slab
 {
 	private:
 
+		size_t _sz;
+
 		size_t _calculate_block_size(size_t object_size)
 		{
 			size_t block_size = 8 * (object_size + sizeof(Slab_entry)) + sizeof(Slab_block);
 			return align_addr(block_size, 12);
 		}
 
+		uint64_t _alloc_bytes;
+		uint64_t _free_bytes;
+
 	public:
 
 		Slab_alloc(size_t object_size, Backend_alloc *allocator)
-		: Slab(object_size, _calculate_block_size(object_size), 0, allocator)
-    { }
+		:
+			Slab(object_size, _calculate_block_size(object_size), 0, allocator),
+			_sz(object_size), _alloc_bytes(0ULL), _free_bytes(0ULL)
+		{ }
 
 	inline addr_t alloc()
 	{
 		addr_t result;
-		return (Slab::alloc(slab_size(), (void **)&result) ? result : 0);
+		bool const ok = Slab::alloc(slab_size(), (void **)&result);
+		_alloc_bytes += ok * _sz;
+		return ok ? result : 0;
+	}
+
+	inline void free(void *addr)
+	{
+		Slab::free(addr);
+		_free_bytes += _sz;
+	}
+
+	inline void dump()
+	{
+		PINF("dump %u: %u (%llu) %u (%llu) %d (%lld)",
+		     _sz, _alloc_bytes / _sz, _alloc_bytes, _free_bytes / _sz, _free_bytes,
+		     _alloc_bytes / _sz - _free_bytes / _sz, _alloc_bytes - _free_bytes);
 	}
 };
 
@@ -220,11 +243,15 @@ class Malloc
 			return index;
 		}
 
+		enum { DUMP_COUNT = 0 }; /* 512*1024U */
+		unsigned _alloc_count;
+
 	public:
 
 		Malloc(Slab_backend_alloc *alloc, Genode::Cache_attribute cached)
 		: _back_allocator(alloc), _cached(cached), _start(alloc->start()),
-		  _end(alloc->end())
+		  _end(alloc->end()),
+		  _alloc_count(0U)
 		{
 			/* init slab allocators */
 			for (unsigned i = SLAB_START_LOG2; i <= SLAB_STOP_LOG2; i++)
@@ -238,6 +265,14 @@ class Malloc
 		void *alloc(Genode::size_t size, int align = 0, Genode::addr_t *phys = 0)
 		{
 			using namespace Genode;
+
+			if (DUMP_COUNT && ++_alloc_count == DUMP_COUNT) {
+				PINF("dump slab allocators:");
+				for (unsigned i = 0; i < NUM_SLABS; i++)
+					_allocator[i]->dump();
+				_alloc_count = 0U;
+			}
+
 			/* += slab index + aligment size */
 			size += sizeof(addr_t) + (align > 2 ? (1 << align) : 0);
 
@@ -419,6 +454,87 @@ void *alloc_large_system_hash(const char *tablename,
 }
 
 
+void *kmalloc_array(size_t n, size_t size, gfp_t flags)
+{
+	if (size != 0 && n > SIZE_MAX / size) return NULL;
+	return kmalloc(n * size, flags);
+}
+
+
+/********************
+ ** linux/slab.h   **
+ ********************/
+
+struct kmem_cache
+{
+	const char *name; /* cache name */
+	unsigned    size; /* object size */
+};
+
+
+struct kmem_cache *kmem_cache_create(const char *name, size_t size, size_t align,
+                                     unsigned long falgs, void (*ctor)(void *))
+{
+	lx_log(DEBUG_SLAB, "\"%s\" obj_size=%zd", name, size);
+
+	struct kmem_cache *cache;
+
+	if (!name) {
+		pr_info("kmem_cache name required\n");
+		return 0;
+	}
+
+	cache = (struct kmem_cache *)kmalloc(sizeof(*cache), 0);
+	if (!cache) {
+		pr_crit("No memory for slab cache\n");
+		return 0;
+	}
+
+	cache->name = name;
+	cache->size = size;
+
+	return cache;
+}
+
+
+void *kmem_cache_alloc_node(struct kmem_cache *cache, gfp_t flags, int node)
+{
+	void *objp = kmalloc(cache->size, 0);
+	lx_log(DEBUG_SLAB, "\"%s\" alloc obj_size=%u objp=%p",  cache->name,cache->size, objp);
+	return objp;
+}
+
+
+void *kmem_cache_alloc(struct kmem_cache *cache, gfp_t flags)
+{
+	void *objp = kmalloc(cache->size, 0);
+	lx_log(DEBUG_SLAB, "\"%s\" alloc obj_size=%u objp=%p",  cache->name,cache->size, objp);
+	return objp;
+}
+
+
+void kmem_cache_free(struct kmem_cache *cache, void *objp)
+{
+	lx_log(DEBUG_SLAB, "\"%s\" (%p)", cache->name, objp);
+	kfree(objp);
+}
+
+
+/*********************
+ ** linux/vmalloc.h **
+ *********************/
+
+void *vmalloc(unsigned long size)
+{
+	return kmalloc(size, 0);
+}
+
+
+void vfree(void const *addr)
+{
+	kfree(addr);
+}
+
 
 /********************
  ** linux/string.h **
@@ -529,6 +645,9 @@ void *genode_memcpy(void *d, const void *s, size_t n)
 unsigned long ilog2(unsigned long n) { return Genode::log2<unsigned long>(n); }
 
 
+int rounddown_pow_of_two(u32 n) { return 1U << Genode::log2(n); }
+
+
 /*******************
  ** linux/sched.h **
  *******************/
@@ -617,11 +736,12 @@ class Avl_page : public Genode::Avl_node<Avl_page>
 			_page->addr = (void *)_addr;
 			atomic_set(&_page->_count, 1);
 
-			lx_log(DEBUG_SLAB, "alloc page: %p addr: %lx-%lx", _page, _addr, _addr + size);
+			lx_log(DEBUG_SLAB, "alloc page: %p addr: %lx-%lx", _page, _addr, _addr + _size);
 		}
 
 		virtual ~Avl_page()
 		{
+			lx_log(DEBUG_SLAB, "free page: %p addr: %lx-%lx", _page, _addr, _addr + _size);
 			kfree((void *)_addr);
 			kfree((void *)_page);
 		}
@@ -632,12 +752,12 @@ class Avl_page : public Genode::Avl_node<Avl_page>
 		{
 			return c->_addr > _addr;
 		}
-	
+
 		Avl_page *find_by_address(Genode::addr_t addr)
 		{
 			if (addr >= _addr && addr < _addr + _size)
 				return this;
-	
+
 			bool side = addr > _addr;
 			Avl_page *c = Avl_node<Avl_page>::child(side);
 			return c ? c->find_by_address(addr) : 0;
@@ -655,6 +775,24 @@ struct page *alloc_pages(gfp_t gfp_mask, unsigned int order)
 	} catch (...) { return 0; }
 
 	return p->page();
+}
+
+void *__alloc_page_frag(struct page_frag_cache *nc,
+                        unsigned int fragsz, gfp_t gfp_mask)
+{
+	struct page *page = alloc_pages(gfp_mask, fragsz / PAGE_SIZE);
+	if (!page) return nullptr;
+
+	return page->addr;
+}
+
+
+void __free_page_frag(void *addr)
+{
+	Avl_page *p = tree.first()->find_by_address((Genode::addr_t)addr);
+
+	tree.remove(p);
+	destroy(Genode::env()->heap(), p);
 }
 
 
@@ -710,4 +848,159 @@ extern "C" void lx_trace_event(char const *fmt, ...)
 	va_start(list, fmt);
 	create_event(fmt, list);
 	va_end(list);
+}
+
+
+/*****************
+ ** linux/uio.h **
+ *****************/
+
+size_t copy_from_iter(void *addr, size_t bytes, struct iov_iter *i)
+{
+	if (bytes > i->count)
+		bytes = i->count;
+
+	if (bytes == 0)
+		return 0;
+
+	char             *kdata = reinterpret_cast<char*>(addr);
+	struct iovec const *iov = i->iov;
+
+	size_t len = bytes;
+	while (len > 0) {
+		if (iov->iov_len) {
+			size_t copy_len = (size_t)len < iov->iov_len ? len : iov->iov_len;
+			Genode::memcpy(kdata, iov->iov_base, copy_len);
+
+			len -= copy_len;
+			kdata += copy_len;
+			i->count -= copy_len; /* XXX the vanilla macro does that */
+		}
+		iov++;
+	}
+
+	return bytes;
+}
+
+
+size_t copy_to_iter(void *addr, size_t bytes, struct iov_iter *i)
+{
+	if (bytes > i->count)
+		bytes = i->count;
+
+	if (bytes == 0)
+		return 0;
+
+	char             *kdata = reinterpret_cast<char*>(addr);
+	struct iovec const *iov = i->iov;
+
+	size_t len = bytes;
+	while (len > 0) {
+		if (iov->iov_len) {
+			size_t copy_len = (size_t)len < iov->iov_len ? len : iov->iov_len;
+			Genode::memcpy(iov->iov_base, kdata, copy_len);
+
+			len   -= copy_len;
+			kdata += copy_len;
+
+			i->count -= copy_len; /* XXX the vanilla macro does that */
+		}
+		iov++;
+	}
+
+	return bytes;
+}
+
+
+size_t copy_page_to_iter(struct page *page, size_t offset, size_t bytes,
+                         struct iov_iter *i)
+{
+	return copy_to_iter(reinterpret_cast<unsigned char*>(page->addr) + offset, bytes, i);
+}
+
+
+size_t copy_page_from_iter(struct page *page, size_t offset, size_t bytes,
+                           struct iov_iter *i)
+{
+	return copy_from_iter(reinterpret_cast<unsigned char*>(page->addr) + offset, bytes, i);
+}
+
+
+size_t csum_and_copy_from_iter(void *addr, size_t bytes, __wsum *csum, struct iov_iter *i)
+{
+	if (bytes > i->count)
+		bytes = i->count;
+
+	if (bytes == 0)
+		return 0;
+
+	char             *kdata = reinterpret_cast<char*>(addr);
+	struct iovec const *iov = i->iov;
+
+	__wsum sum = 0;
+	size_t len = bytes;
+	while (len > 0) {
+		if (iov->iov_len) {
+			size_t copy_len = (size_t)len < iov->iov_len ? len : iov->iov_len;
+			int err = 0;
+			__wsum next = csum_and_copy_from_user(iov->iov_base, kdata, copy_len, 0, &err);
+
+			if (err) {
+				PERR("%s: err: %d - sleeping", __func__, err);
+				Genode::sleep_forever();
+			}
+
+			sum = csum_block_add(sum, next, bytes-len);
+
+			len   -= copy_len;
+			kdata += copy_len;
+
+			i->count -= copy_len; /* XXX the vanilla macro does that */
+		}
+		iov++;
+	}
+
+	*csum = sum;
+
+	return bytes;
+}
+
+
+size_t csum_and_copy_to_iter(void *addr, size_t bytes, __wsum *csum, struct iov_iter *i)
+{
+	if (bytes > i->count)
+		bytes = i->count;
+
+	if (bytes == 0)
+		return 0;
+
+	char             *kdata = reinterpret_cast<char*>(addr);
+	struct iovec const *iov = i->iov;
+
+	__wsum sum = 0;
+	size_t len = bytes;
+	while (len > 0) {
+		if (iov->iov_len) {
+			size_t copy_len = (size_t)len < iov->iov_len ? len : iov->iov_len;
+			int err = 0;
+			__wsum next = csum_and_copy_to_user(kdata, iov->iov_base, copy_len, 0, &err);
+
+			if (err) {
+				PERR("%s: err: %d - sleeping", __func__, err);
+				Genode::sleep_forever();
+			}
+
+			sum = csum_block_add(sum, next, bytes-len);
+
+			len   -= copy_len;
+			kdata += copy_len;
+
+			i->count -= copy_len; /* XXX the vanilla macro does that */
+		}
+		iov++;
+	}
+
+	*csum = sum;
+
+	return bytes;
 }
