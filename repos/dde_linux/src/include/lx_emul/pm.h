@@ -23,7 +23,11 @@ struct device;
 
 typedef struct pm_message { int event; } pm_message_t;
 
-struct dev_pm_info { pm_message_t power_state; };
+struct dev_pm_info
+{
+	pm_message_t power_state;
+	bool         is_prepared;
+};
 
 struct dev_pm_ops {
 	int (*suspend)(struct device *dev);

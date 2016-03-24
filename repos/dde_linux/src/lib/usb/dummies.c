@@ -46,13 +46,6 @@ void *kmalloc_array(size_t n, size_t size, gfp_t flags) { TRACE; return (void *)
 int  atomic_inc_return(atomic_t *v) { TRACE; return 0; }
 
 
-/*******************************
- ** linux/errno.h and friends **
- *******************************/
-
-long PTR_ERR(const void *ptr) { TRACE; return 0; }
-
-
 /********************
  ** linux/kernel.h **
  ********************/
@@ -82,8 +75,8 @@ int roundup_pow_of_two(u32 n) { TRACE; return 0; }
 void print_hex_dump(const char *level, const char *prefix_str,
                     int prefix_type, int rowsize, int groupsize,
                     const void *buf, size_t len, bool ascii) { TRACE; }
-int printk_ratelimit() { TRACE; return 0; }
-int printk_ratelimited() { TRACE; return 0; }
+bool printk_ratelimit() { TRACE; return 0; }
+bool printk_ratelimited() { TRACE; return 0; }
 bool printk_timed_ratelimit(unsigned long *caller_jiffies,
                             unsigned int interval_msec) { TRACE; return false; }
 
@@ -138,7 +131,6 @@ void assert_spin_locked(spinlock_t *lock) { TRACE;}
  ** linux/mutex.h **
  *******************/
 
-void mutex_lock_nested(struct mutex *lock, unsigned int subclass) { SKIP; }
 int  mutex_lock_interruptible(struct mutex *m) { SKIP; return 0; }
 void mutex_init  (struct mutex *m) { SKIP; }
 void mutex_lock  (struct mutex *m) { SKIP; }
@@ -1083,6 +1075,14 @@ int devm_gpio_request_one(struct device *dev, unsigned gpio,
 
  int of_get_named_gpio(struct device_node *np,
                        const char *propname, int index) { TRACE; return 0; }
+
+
+/********************
+ ** linux/module.h **
+ ********************/
+
+void module_put(struct module *m)   { TRACE; }
+void __module_get(struct module *m) { TRACE; }
 
 
 /******************

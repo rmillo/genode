@@ -130,7 +130,6 @@ class Routine : public Genode::List<Routine>::Element
 		 * If all is true, each object will be scheduled once.
 		 */
 		static void schedule(bool all = false, bool main = false)
-			__attribute__((noinline))
 		{
 			if (!_list()->first() && !_main)
 				return;

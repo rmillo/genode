@@ -956,19 +956,6 @@ void msleep(unsigned int msecs) { _timer.msleep(msecs); }
 void mdelay(unsigned long msecs) { msleep(msecs); }
 
 
-/*********************
- ** linux/jiffies.h **
- *********************/
-
-enum { JIFFIES_TICK_MS = 1000 / HZ };
-
-unsigned long msecs_to_jiffies(const unsigned int m) { return m / JIFFIES_TICK_MS; }
-unsigned int jiffies_to_msecs(const unsigned long j) { return j * JIFFIES_TICK_MS; }
-
-long time_after_eq(long a, long b) { return (a - b) >= 0; }
-long time_after(long a, long b)    { return (b - a) < 0; }
-
-
 /*********
  ** DMA **
  *********/

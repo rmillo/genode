@@ -3,7 +3,7 @@ LIB_INC_DIR = $(LIB_DIR)/include
 
 LIBS     += usb_include libc-setjmp config
 SRC_CC   += main.cc lx_emul.cc irq.cc timer.cc event.cc storage.cc \
-            input_component.cc nic.cc raw.cc lx_console.cc
+            input_component.cc nic.cc raw.cc
 SRC_C    += dummies.c scsi.c evdev.c raw_driver.c
 
 LX_CONTRIB_DIR := $(call select_from_ports,dde_linux)/src/lib/usb
@@ -16,7 +16,7 @@ CC_OLEVEL = -O2
 # The order of include-search directories is important, we need to look into
 # 'contrib' before falling back to our custom 'lx_emul.h' header.
 #
-INC_DIR += $(LIB_INC_DIR)
+INC_DIR += $(LIB_INC_DIR) $(REP_DIR)/src/include
 INC_DIR += $(LX_CONTRIB_DIR)/include $(LX_CONTRIB_DIR)/include/uapi $(LX_CONTRIB_DIR)
 
 CC_OPT += -U__linux__ -D__KERNEL__
@@ -37,6 +37,9 @@ CC_CXX_OPT = -fpermissive
 MOD_SUFFIX =
 CC_OPT += -DMOD_SUFFIX=$(MOD_SUFFIX)
 
+# lx_kit
+SRC_CC += printf.cc
+
 # common lib
 SRC_C += lib/int_sqrt.c
 
@@ -44,7 +47,6 @@ SRC_C += lib/int_sqrt.c
 SRC_C += $(addprefix usb/core/, buffer.c config.c devices.c driver.c endpoint.c file.c \
                                 generic.c hcd.c hub.c message.c notify.c port.c quirks.c\
                                 urb.c usb.c)
-
 
 # USB host-controller driver
 SRC_C += $(addprefix usb/host/, ehci-hcd.c)
@@ -87,5 +89,6 @@ vpath %.cc $(LIB_DIR)/nic
 vpath %.cc $(LIB_DIR)/raw
 vpath %.c  $(LIB_DIR)/raw
 vpath lib/int_sqrt.c $(LX_CONTRIB_DIR)
+vpath %.cc $(REP_DIR)/src/lx_kit
 
 # vi: set ft=make :
