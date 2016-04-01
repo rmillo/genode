@@ -24,6 +24,16 @@ void init_waitqueue_head(wait_queue_head_t *wq)
 }
 
 
+void remove_wait_queue(wait_queue_head_t *wq, wait_queue_t *wait)
+{
+	Wait_list *list = static_cast<Wait_list*>(wq->list);
+	if (!list)
+		return;
+
+	destroy(Genode::env()->heap(), list);
+}
+
+
 int waitqueue_active(wait_queue_head_t *wq)
 {
 	Wait_list *list = static_cast<Wait_list*>(wq->list);
@@ -89,14 +99,13 @@ void complete(struct completion *work)
 unsigned long wait_for_completion_timeout(struct completion *work,
                                           unsigned long timeout)
 {
-	__wait_completion(work);
-	return 1;
+	return __wait_completion(work, timeout);
 }
 
 
 int wait_for_completion_interruptible(struct completion *work)
 {
-	__wait_completion(work);
+	__wait_completion(work, 0);;
 	return 0;
 }
 
@@ -104,12 +113,11 @@ int wait_for_completion_interruptible(struct completion *work)
 long wait_for_completion_interruptible_timeout(struct completion *work,
                                                unsigned long timeout)
 {
-	__wait_completion(work);
-	return 1;
+	return __wait_completion(work, timeout);
 }
 
 
 void wait_for_completion(struct completion *work)
 {
-	__wait_completion(work);
+	__wait_completion(work, 0);
 }

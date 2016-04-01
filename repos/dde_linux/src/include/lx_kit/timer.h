@@ -38,26 +38,26 @@ namespace Lx {
 	void timer_update_jiffies();
 }
 
-struct timer_list;
 
 class Lx::Timer
 {
 	public:
 
+		enum Type { LIST, HR };
 		/**
 		 * Add new linux timer
 		 */
-		virtual void add(struct ::timer_list *timer) = 0;
+		virtual void add(void *timer, Type type = LIST) = 0;
 
 		/**
 		 * Delete linux timer
 		 */
-		virtual int del(struct ::timer_list *timer) = 0;
+		virtual int del(void *timer) = 0;
 
 		/**
 		 * Initial scheduling of linux timer
 		 */
-		virtual int schedule(struct ::timer_list *timer, unsigned long expires) = 0;
+		virtual int schedule(void *timer, unsigned long expires) = 0;
 
 		/**
 		 * Schedule next linux timer
@@ -67,12 +67,12 @@ class Lx::Timer
 		/**
 		 * Check if the timer is currently pending
 		 */
-		virtual bool pending(struct ::timer_list const *timer) = 0;
+		virtual bool pending(void const *timer) = 0;
 
 		/**
 		 * Check if the timer is already present
 		 */
-		virtual bool find(struct ::timer_list const *timer) const = 0;
+		virtual bool find(void const *timer) const = 0;
 
 		/**
 		 * Update jiffie counter

@@ -51,3 +51,27 @@ int del_timer(struct timer_list *timer)
 
 	return rv;
 }
+
+
+void hrtimer_init(struct hrtimer *timer, clockid_t clock_id, enum hrtimer_mode mode) { }
+
+
+int hrtimer_start_range_ns(struct hrtimer *timer, ktime_t tim,
+                           unsigned long delta_ns, const enum hrtimer_mode mode)
+{
+	unsigned long expires = tim.tv64 / (NSEC_PER_MSEC * HZ);
+
+	if (!Lx::timer().find(timer))
+		Lx::timer().add(timer);
+
+	return Lx::timer().schedule(timer, expires);
+}
+
+
+int hrtimer_cancel(struct hrtimer *timer)
+{
+	int rv = Lx::timer().del(timer);
+	Lx::timer().schedule_next();
+
+	return rv;
+}
