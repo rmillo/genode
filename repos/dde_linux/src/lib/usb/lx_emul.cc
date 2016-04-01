@@ -25,7 +25,9 @@
 #include "platform/lx_mem.h"
 #include "lx_emul.h"
 
+#include <lx_kit/irq.h>
 #include <lx_kit/scheduler.h>
+#include <lx_kit/work.h>
 
 
 namespace Genode {
@@ -1347,11 +1349,29 @@ int blocking_notifier_call_chain(struct blocking_notifier_head *nh,
 #include <lx_emul/impl/timer.h>
 
 
+signed long schedule_timeout_uninterruptible(signed long timeout)
+{
+	lx_log(DEBUG_COMPLETION, "%ld\n", timeout);
+	schedule_timeout(timeout);
+	return 0;
+}
+
+
 /************************
  ** linux/completion.h **
  ************************/
 
 #include <lx_emul/impl/completion.h>
+
+
+long __wait_completion(struct completion *work, unsigned long timeout)
+{
+	//TODO: implement timeout
+	wait_queue_head_t wait;
+	_wait_event(wait, work->done);
+	work->done = 0;
+	return 0;
+}
 
 
 /***********************
@@ -1361,6 +1381,51 @@ int blocking_notifier_call_chain(struct blocking_notifier_head *nh,
 #include <lx_emul/impl/work.h>
 
 
+void tasklet_init(struct tasklet_struct *t, void (*f)(unsigned long), unsigned long d)
+{
+	t->func    = f;
+	t->data    = d;
+}
+
+
+void tasklet_schedule(struct tasklet_struct *tasklet)
+{
+	Lx::Work::work_queue().schedule_tasklet(tasklet);
+}
+
+
+void tasklet_hi_schedule(struct tasklet_struct *tasklet)
+{
+	/*
+	 * High priority, execute immediately
+	 */
+	tasklet->func(tasklet->data);
+}
+
+
+struct workqueue_struct *create_singlethread_workqueue(char const *)
+{
+	workqueue_struct *wq = (workqueue_struct *)kzalloc(sizeof(workqueue_struct), 0);
+	return wq;
+}
+
+
+struct workqueue_struct *alloc_workqueue(const char *fmt, unsigned int flags,
+                                         int max_active, ...)
+{
+	return create_singlethread_workqueue(nullptr);
+}
+
+
+bool queue_work(struct workqueue_struct *wq, struct work_struct *work)
+{
+	Lx::Work::work_queue().schedule(work);
+	Lx::Work::work_queue().unblock();
+
+	return true;
+}
+
+
 /******************
  ** linux/wait.h **
  ******************/
@@ -1368,3 +1433,13 @@ int blocking_notifier_call_chain(struct blocking_notifier_head *nh,
 #include <lx_emul/impl/wait.h>
 
 
+/***********************
+ ** linux/interrupt.h **
+ ***********************/
+
+int request_irq(unsigned int irq, irq_handler_t handler, unsigned long flags,
+                const char *name, void *dev)
+{
+	PDBG("IMPLEMENT ME");
+	return 0;
+}

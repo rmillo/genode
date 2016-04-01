@@ -161,14 +161,6 @@ void complete_and_exit(struct completion *work, long code)
 #endif 
 
 
-long __wait_completion(struct completion *work, unsigned long timeout)
-{
-	//TODO: implement timeout
-	wait_queue_head_t wait;
-	_wait_event(wait, work->done);
-	work->done = 0;
-	return 0;
-}
 
 #if 0
 static unsigned long
@@ -227,12 +219,6 @@ void wait_for_completion(struct completion *work)
  ** linux/timer.h **
  *******************/
 
-signed long schedule_timeout_uninterruptible(signed long timeout)
-{
-	lx_log(DEBUG_COMPLETION, "%ld\n", timeout);
-	schedule_timeout(timeout);
-	return 0;
-}
 
 #if 0
 int wake_up_process(struct task_struct *tsk)
@@ -273,53 +259,11 @@ bool queue_delayed_work(struct workqueue_struct *wq,
  ** linux/interrupt.h **
  ***********************/
 
-void tasklet_init(struct tasklet_struct *t, void (*f)(unsigned long), unsigned long d)
-{
-	t->func    = f;
-	t->data    = d;
-}
-
-
-void tasklet_schedule(struct tasklet_struct *tasklet)
-{
-	Lx::Work::work_queue().schedule_tasklet(tasklet);
-}
-
-
-void tasklet_hi_schedule(struct tasklet_struct *tasklet)
-{
-	/*
-	 * High priority, execute immediately
-	 */
-	tasklet->func(tasklet->data);
-}
-
 
 /***********************
  ** linux/workqueue.h **
  ***********************/
 
-struct workqueue_struct *create_singlethread_workqueue(char const *)
-{
-	workqueue_struct *wq = (workqueue_struct *)kzalloc(sizeof(workqueue_struct), 0);
-	return wq;
-}
-
-
-struct workqueue_struct *alloc_workqueue(const char *fmt, unsigned int flags,
-                                         int max_active, ...)
-{
-	return create_singlethread_workqueue(nullptr);
-}
-
-
-bool queue_work(struct workqueue_struct *wq, struct work_struct *work)
-{
-	Lx::Work::work_queue().schedule(work);
-	Lx::Work::work_queue().unblock();
-
-	return true;
-}
 
 
 /**********

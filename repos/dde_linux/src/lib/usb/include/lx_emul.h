@@ -163,21 +163,6 @@ typedef unsigned short ushort;
 #define WRITE_ONCE(x, val) x=(val)
 
 
-/***********************
- ** linux/irqreturn.h **
- ***********************/
-
-enum irqreturn {
-	IRQ_NONE,
-	IRQ_HANDLED = (1 << 0),
-};
-
-/* needed by 'dwc_otg_hcd_linux.c' */
-#define IRQ_RETVAL(x) ((x) != IRQ_NONE)
-
-typedef enum irqreturn irqreturn_t;
-
-
 /*********************
  ** uapi/linux/uuid **
  *********************/
@@ -1597,6 +1582,17 @@ static inline u32 inl_p(u32 port) { u32 ret = inl(port); native_io_delay(); retu
 #include <lx_emul/ioport.h>
 
 
+
+/***********************
+ ** linux/irqreturn.h **
+ ***********************/
+
+#include <lx_emul/irq.h>
+
+/* needed by 'dwc_otg_hcd_linux.c' */
+#define IRQ_RETVAL(x) ((x) != IRQ_NONE)
+
+
 /***********************
  ** linux/interrupt.h **
  ***********************/
@@ -1607,10 +1603,9 @@ static inline u32 inl_p(u32 port) { u32 ret = inl(port); native_io_delay(); retu
 void local_irq_enable(void);
 void local_irq_disable(void);
 
-typedef irqreturn_t (*irq_handler_t)(int, void *);
-
 int request_irq(unsigned int irq, irq_handler_t handler, unsigned long flags,
                 const char *name, void *dev);
+
 void free_irq(unsigned int, void *);
 
 

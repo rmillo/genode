@@ -103,8 +103,6 @@ void start_usb_driver(Server::Entrypoint &ep)
 	if (services.hid)
 		start_input_service(&ep.rpc_ep(), &services);
 
-	Irq::init(ep);
-	Event::init(ep);
 	Storage::init(ep);
 	Nic::init(ep);
 

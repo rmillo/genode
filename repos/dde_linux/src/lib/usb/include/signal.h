@@ -73,11 +73,6 @@ class Signal_helper
 		Genode::Signal_transmitter &sender() { return _sender; }
 };
 
-namespace Irq
-{
-	void init(Server::Entrypoint &ep);
-	void check_irq();
-}
 
 namespace Event
 {
