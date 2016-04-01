@@ -45,27 +45,56 @@ class Lx_kit::Timer : public Lx::Timer
 		{
 			enum { INVALID_TIMEOUT = ~0UL };
 
-			struct timer_list *timer;
+			Type               type;
+			void              *timer;
 			bool               pending { false };
 			unsigned long      timeout { INVALID_TIMEOUT }; /* absolute in jiffies */
 			bool               programmed { false };
 
-			Context(struct timer_list *timer) : timer(timer) { }
+			Context(struct timer_list *timer) : type(LIST), timer(timer) { }
+			Context(struct hrtimer    *timer) : type(HR),   timer(timer) { }
+
+			void expires(unsigned long e)
+			{
+				if (type == LIST)
+					static_cast<timer_list *>(timer)->expires = e;
+			}
+
+			void function()
+			{
+				switch (type) {
+				case LIST:
+					{
+						timer_list *t = static_cast<timer_list *>(timer);
+						if (t->function)
+							t->function(t->data);
+					}
+					break;
+
+				case HR:
+					{
+						hrtimer *t = static_cast<hrtimer *>(timer);
+						if (t->function)
+							t->function(t);
+					}
+					break;
+				}
+			}
 		};
 
 	private:
 
 		unsigned long                               &_jiffies;
 		::Timer::Connection                          _timer_conn;
-		Lx_kit::List<Context>                            _list;
+		Lx_kit::List<Context>                        _list;
 		Lx::Task                                     _timer_task;
-		Genode::Signal_rpc_member<Lx_kit::Timer>         _dispatcher;
+		Genode::Signal_rpc_member<Lx_kit::Timer>     _dispatcher;
 		Genode::Tslab<Context, 32 * sizeof(Context)> _timer_alloc;
 
 		/**
 		 * Lookup local timer
 		 */
-		Context *_find_context(struct timer_list const *timer)
+		Context *_find_context(void const *timer)
 		{
 			for (Context *c = _list.first(); c; c = c->next())
 				if (c->timer == timer)
@@ -121,7 +150,7 @@ class Lx_kit::Timer : public Lx::Timer
 			 * struct timer_list because the wireless stack checks
 			 * it directly.
 			 */
-			ctx->timer->expires = expires;
+			ctx->expires(expires);
 
 			Context *c;
 			for (c = _list.first(); c; c = c->next())
@@ -173,7 +202,7 @@ class Lx_kit::Timer : public Lx::Timer
 					if (ctx->timeout > t.jiffies())
 						break;
 
-					ctx->timer->function(ctx->timer->data);
+					ctx->function();
 					t.del(ctx->timer);
 				}
 
@@ -184,14 +213,19 @@ class Lx_kit::Timer : public Lx::Timer
 		/*************************
 		 ** Lx::Timer interface **
 		 *************************/
-
-		void add(struct timer_list *timer)
+		void add(void *timer, Type type)
 		{
-			Context *t = new (&_timer_alloc) Context(timer);
+			Context *t = nullptr;
+
+			if (type == HR)
+				t = new (&_timer_alloc) Context(static_cast<hrtimer *>(timer));
+			else
+				t = new (&_timer_alloc) Context(static_cast<timer_list *>(timer));
+
 			_list.append(t);
 		}
 
-		int del(struct timer_list *timer)
+		int del(void *timer)
 		{
 			Context *ctx = _find_context(timer);
 
@@ -210,7 +244,7 @@ class Lx_kit::Timer : public Lx::Timer
 			return rv;
 		}
 
-		int schedule(struct timer_list *timer, unsigned long expires)
+		int schedule(void *timer, unsigned long expires)
 		{
 			Context *ctx = _find_context(timer);
 			if (!ctx) {
@@ -234,7 +268,7 @@ class Lx_kit::Timer : public Lx::Timer
 		/**
 		 * Check if the timer is currently pending
 		 */
-		bool pending(struct timer_list const *timer)
+		bool pending(void const *timer)
 		{
 			Context *ctx = _find_context(timer);
 			if (!ctx) {
@@ -244,7 +278,7 @@ class Lx_kit::Timer : public Lx::Timer
 			return ctx->pending;
 		}
 
-		bool find(struct timer_list const *timer) const
+		bool find(void const *timer) const
 		{
 			for (Context const *c = _list.first(); c; c = c->next())
 				if (c->timer == timer)
