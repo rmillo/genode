@@ -17,8 +17,8 @@
 #include <util/endian.h>
 #include <util/list.h>
 
-#include <extern_c_begin.h>
 #include <lx_emul.h>
+#include <extern_c_begin.h>
 #include <storage/scsi.h>
 #include <drivers/usb/storage/usb.h>
 #include <extern_c_end.h>
@@ -191,7 +191,7 @@ static work_struct delayed;
 extern "C" void ack_packet(work_struct *work)
 {
 	Block::Packet_descriptor *packet =
-		static_cast<Block::Packet_descriptor *>(work->data);
+		(Block::Packet_descriptor *)(work->data);
 
 	if (verbose)
 		PDBG("ACK packet for block: %llu", packet->block_number());

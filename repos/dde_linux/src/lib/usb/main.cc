@@ -92,8 +92,6 @@ static int init(void *s)
 	/* host controller */
 	platform_hcd_init(services);
 
-	Event::loop();
-
 	return 0;
 }
 
@@ -105,7 +103,6 @@ void start_usb_driver(Server::Entrypoint &ep)
 	if (services.hid)
 		start_input_service(&ep.rpc_ep(), &services);
 
-	Timer::init(ep);
 	Irq::init(ep);
 	Event::init(ep);
 	Storage::init(ep);

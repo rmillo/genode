@@ -23,7 +23,7 @@
 
 #include "signal.h"
 #include "list.h"
-
+#if 0
 unsigned long jiffies;
 
 
@@ -317,7 +317,7 @@ static int  run_timer(void *)
 
 	return 0;
 }
-
+#endif 
 
 /*******************
  ** linux/timer.h **

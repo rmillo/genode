@@ -202,9 +202,6 @@ struct workqueue_struct *system_power_efficient_wq = &dummy;
 
 void destroy_workqueue(struct workqueue_struct *wq) { TRACE; }
 
-bool cancel_work_sync(struct work_struct *work) { TRACE; return 0; }
-int cancel_delayed_work_sync(struct delayed_work *work) { TRACE; return 0; }
-
 bool flush_work(struct work_struct *work) { TRACE; return 0; }
 bool flush_work_sync(struct work_struct *work) { TRACE; return 0; }
 
@@ -238,6 +235,13 @@ void cpu_relax(void) { TRACE; udelay(1); }
 signed long schedule_timeout(signed long timeout) { TRACE; return 0; }
 
 struct task_struct *current;
+
+
+/******************
+ ** linux/wait.h **
+ ******************/
+
+void add_wait_queue(wait_queue_head_t *q, wait_queue_t *wait) { TRACE; }
 
 
 /*********************

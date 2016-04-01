@@ -21,6 +21,8 @@
 #include <stdarg.h>
 #include <base/fixed_stdint.h>
 
+#include <lx_emul/extern_c_begin.h>
+
 #define DEBUG_COMPLETION 0
 #define DEBUG_DMA        0
 #define DEBUG_DRIVER     0
@@ -88,6 +90,7 @@ enum { USBDEVICE_SUPER_MAGIC = 0x9fa2 };
  ******************/
 
 typedef struct atomic { unsigned int v; } atomic_t;
+typedef void*  atomic_long_t;
 
 void atomic_set(atomic_t *p, unsigned int v);
 unsigned int atomic_read(atomic_t *p);
@@ -319,9 +322,6 @@ int snprintf(char *buf, size_t size, const char *fmt, ...);
 int sprintf(char *buf, const char *fmt, ...);
 int sscanf(const char *, const char *, ...);
 int scnprintf(char *buf, size_t size, const char *fmt, ...);
-
-struct completion;
-void complete_and_exit(struct completion *, long);
 
 
 /*********************
@@ -632,27 +632,6 @@ ktime_t ktime_mono_to_real(ktime_t mono);
 #include <lx_emul/timer.h>
 
 
-/*********************
- ** linux/hrtimer.h **
- *********************/
-
-enum hrtimer_mode { HRTIMER_MODE_ABS = 0 };
-enum hrtimer_restart { HRTIMER_NORESTART = 0 };
-
-struct hrtimer
-{
-	enum hrtimer_restart (*function)(struct hrtimer *);
-	struct hrtimer        *data;
-	void                  *timer;
-};
-
-int hrtimer_start_range_ns(struct hrtimer *, ktime_t,
-                          unsigned long, const enum hrtimer_mode);
-
-void hrtimer_init(struct hrtimer *, clockid_t, enum hrtimer_mode);
-int hrtimer_cancel(struct hrtimer *);
-
-
 /*******************
  ** linux/delay.h **
  *******************/
@@ -670,32 +649,15 @@ extern unsigned long loops_per_jiffy;  /* needed by 'dwc_otg_attr.c' */
  ** linux/workquque.h **
  ***********************/
 
+#include <lx_emul/work.h>
+
 enum {
 	WORK_STRUCT_PENDING_BIT = 0,
 	WQ_FREEZABLE            = (1 << 2),
 };
 
 
-struct work_struct;
-typedef void (*work_func_t)(struct work_struct *work);
-
-struct work_struct {
-	work_func_t func;
-	struct list_head entry;
-	unsigned         pending;
-	void            *data;
-};
-
-struct delayed_work {
-	struct timer_list timer;
-	struct work_struct work;
-	unsigned           pending;
-};
-
-bool cancel_work_sync(struct work_struct *work);
-int cancel_delayed_work_sync(struct delayed_work *work);
-int schedule_delayed_work(struct delayed_work *work, unsigned long delay);
-int schedule_work(struct work_struct *work);
+#define work_data_bits(work) ((unsigned long *)(&(work)->data))
 
 #define work_pending(work) \
         test_bit(WORK_STRUCT_PENDING_BIT, work_data_bits(work))
@@ -703,135 +665,26 @@ int schedule_work(struct work_struct *work);
 #define delayed_work_pending(w) \
          work_pending(&(w)->work)
 
-#define work_data_bits(work) ((unsigned long *)(&(work)->data))
-
-bool flush_work(struct work_struct *work);
-bool flush_work_sync(struct work_struct *work);
-
-
-#define PREPARE_WORK(_work, _func) \
-	do { \
-	 (_work)->func    = (_func); \
-	 (_work)->pending = 0; \
-	} while (0)
-
-#define PREPARE_DELAYED_WORK(_work, _func) \
-	do { \
-		PREPARE_WORK(&(_work)->work, (_func)); \
-		(_work)->pending = 0; \
-	} while (0)
-
-
-#define __INIT_WORK(_work, _func, on_stack) \
-	do { \
-		INIT_LIST_HEAD(&(_work)->entry); \
-		PREPARE_WORK((_work), (_func)); \
-	} while (0)
-
-#define INIT_WORK(_work, _func)\
-	do { __INIT_WORK((_work), (_func), 0); } while (0)
-
-#define INIT_DELAYED_WORK(_work, _func) \
-	do { \
-		INIT_WORK(&(_work)->work, (_func)); \
-		init_timer(&(_work)->timer); \
-		(_work)->pending = 0; \
-	} while (0)
-
-
 /* dummy for queue_delayed_work call in storage/usb.c */
 #define system_freezable_wq 0
-struct workqueue_struct { unsigned dummy; };
 
 extern struct workqueue_struct *system_power_efficient_wq;
-
-bool queue_delayed_work(struct workqueue_struct *,
-                        struct delayed_work *, unsigned long);
-bool cancel_delayed_work(struct delayed_work *);
-
-
-/* needed for 'dwc_common_linux.c' */
-struct workqueue_struct *create_singlethread_workqueue(char *n);
-struct workqueue_struct *alloc_workqueue(const char *fmt, unsigned int flags,
-                                         int max_active, ...) __printf(1, 4);
-void   destroy_workqueue(struct workqueue_struct *wq);
-
-bool queue_work(struct workqueue_struct *wq, struct work_struct *work);
 
 
 /******************
  ** linux/wait.h **
  ******************/
 
-
-typedef struct wait_queue { int dummy; } wait_queue_t;
-
-#define __WAIT_QUEUE_INITIALIZER(name, tsk) { 0 }
-
-#define DECLARE_WAITQUEUE(name, tsk) \
-	wait_queue_t name = __WAIT_QUEUE_INITIALIZER(name, tsk)
-
-typedef struct wait_queue_head { struct wait_queue *q; } wait_queue_head_t;
-
-void init_waitqueue_head(wait_queue_head_t *q);
-
-#define __WAIT_QUEUE_HEAD_INITIALIZER(name) { 0 }
-#define DECLARE_WAIT_QUEUE_HEAD(name) \
-	wait_queue_head_t name = __WAIT_QUEUE_HEAD_INITIALIZER(name)
-
 #define DECLARE_WAIT_QUEUE_HEAD_ONSTACK(name) DECLARE_WAIT_QUEUE_HEAD(name)
-
-void __wake_up();
-void add_wait_queue(wait_queue_head_t *q, wait_queue_t *wait);
-void remove_wait_queue(wait_queue_head_t *q, wait_queue_t *wait);
-int  waitqueue_active(wait_queue_head_t *q);
-
-#define wake_up(x) __wake_up()
-#define wake_up_all(x) __wake_up()
-#define wake_up_interruptible(x) __wake_up()
 
 extern wait_queue_t wait;
 void breakpoint();
 
-/* our wait event implementation */
-void __wait_event(void);
-
-
-#define _wait_event(condition) \
-	while(!(condition)) { \
-		__wait_event();     \
-	}                     \
-
-#define wait_event(wq, condition) \
-	({ _wait_event(condition); })
-
-
-#define _wait_event_timeout(condition, timeout) \
-({ \
-	unsigned long _j = jiffies + timeout; \
-	while(1) { \
-		__wait_event();     \
-		if (condition || _j <= jiffies)     \
-			break;          \
-	}  \
-})
-
-#define wait_event_interruptible(wq, condition) \
-({                        \
-	_wait_event(condition); \
-	0;                      \
-})
 
 #define wait_event_interruptible_timeout(wq, condition, timeout) \
 ({                        \
-	_wait_event_timeout(condition, timeout); \
+	_wait_event_timeout(wq, condition, timeout); \
 	1;                      \
-})
-
-#define wait_event_timeout(wq, condition, timeout) \
-({                                \
-	_wait_event_timeout(condition, timeout); \
-	1;                              \
 })
 
 
@@ -864,7 +717,6 @@ void schedule(void);
 signed long schedule_timeout(signed long);
 signed long schedule_timeout_uninterruptible(signed long timeout);
 void yield(void);
-int wake_up_process(struct task_struct *tsk);
 
 /* normally defined in asm/current.h, included by sched.h */
 extern struct task_struct *current;
@@ -2084,14 +1936,10 @@ int match_octal(substring_t *, int *result);
  ** linux/completion.h **
  ************************/
 
+#include <lx_emul/completion.h>
+
 struct completion { unsigned int done; };
-void complete(struct completion *);
-void init_completion(struct completion *x);
-unsigned long wait_for_completion_timeout(struct completion *x,
-                                          unsigned long timeout);
-void wait_for_completion(struct completion *x);
-int wait_for_completion_interruptible(struct completion *x);
-long wait_for_completion_interruptible_timeout(struct completion *x, unsigned long timeout);
+long  __wait_completion(struct completion *work, unsigned long timeout);;
 
 
 /*******************
@@ -3359,5 +3207,7 @@ static inline void trace_xhci_dbg_cancel_urb(struct va_format *v) { }
 static inline void trace_xhci_dbg_reset_ep(struct va_format *v) { }
 static inline void trace_xhci_dbg_quirks(struct va_format *v) { }
 static inline void trace_xhci_dbg_address(struct va_format *v) { }
+
+#include <lx_emul/extern_c_end.h>
 
 #endif /* _LX_EMUL_H_ */

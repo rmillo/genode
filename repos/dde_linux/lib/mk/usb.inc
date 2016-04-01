@@ -2,7 +2,7 @@ LIB_DIR     = $(REP_DIR)/src/lib/usb
 LIB_INC_DIR = $(LIB_DIR)/include
 
 LIBS     += usb_include libc-setjmp config
-SRC_CC   += main.cc lx_emul.cc irq.cc timer.cc event.cc storage.cc \
+SRC_CC   += main.cc lx_emul.cc irq.cc event.cc storage.cc \
             input_component.cc nic.cc raw.cc
 SRC_C    += dummies.c scsi.c evdev.c raw_driver.c
 
@@ -38,7 +38,7 @@ MOD_SUFFIX =
 CC_OPT += -DMOD_SUFFIX=$(MOD_SUFFIX)
 
 # lx_kit
-SRC_CC += printf.cc
+SRC_CC += printf.cc work.cc timer.cc scheduler.cc
 
 # common lib
 SRC_C += lib/int_sqrt.c
@@ -69,8 +69,8 @@ SRC_C += $(addprefix usb/storage/,scsiglue.c protocol.c transport.c usb.c \
 # SCSI
 SRC_C += $(addprefix scsi/,scsi.c constants.c)
 
-#SRC_CC = 
-#SRC_C = usb/host/xhci-dbg.o
+#SRC_CC = storage.cc
+#SRC_C =
 
 #
 # Add suffix, since there are two hid-core.c with the same module init function

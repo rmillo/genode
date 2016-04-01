@@ -12,9 +12,10 @@
  */
 
 #include <signal.h>
-#include <extern_c_begin.h>
 #include <lx_emul.h>
-#include <extern_c_end.h>
+
+#include <lx_kit/scheduler.h>
+#include <lx_kit/work.h>
 
 static Signal_helper *_signal = 0;
 
@@ -52,7 +53,7 @@ class Event_context
 void Event::init(Server::Entrypoint &ep) {
 	_signal = new (Genode::env()->heap()) Signal_helper(ep); }
 
-
+#if 0
 /**
  * Delayed work
  */
@@ -123,25 +124,17 @@ class Work : public Genode::List<Work>::Element
 			}
 		}
 };
-
+#endif
 
 /************************
  ** linux/completion.h **
  ************************/
 
-void __wake_up() { Routine::schedule_all(); }
+//oid __wake_up() { Routine::schedule_all(); }
 
 
-void __wait_event()
-{
-	/* schedule work first */
-	Work::exec();
 
-	/* schedule other routines or wait for signals */
-	Service_handler::s()->process();
-}
-
-
+#if 0
 void init_completion(struct completion *work)
 {
 	lx_log(DEBUG_COMPLETION, "New completion %p", work);
@@ -157,26 +150,27 @@ void complete(struct completion *work)
 	/* send signal */
 	Event_context::e()->submit();
 }
-
-
+#endif
+#if 0
 void complete_and_exit(struct completion *work, long code)
 {
 	lx_log(DEBUG_COMPLETION, "%p", work);
 	complete(work);
 	Routine::remove();
 }
+#endif 
 
 
-
-static void __wait_completion(struct completion *work)
+long __wait_completion(struct completion *work, unsigned long timeout)
 {
-	while (!work->done)
-		__wait_event();
-
+	//TODO: implement timeout
+	wait_queue_head_t wait;
+	_wait_event(wait, work->done);
 	work->done = 0;
+	return 0;
 }
 
-
+#if 0
 static unsigned long
 __wait_completion_timeout(struct completion *work, unsigned long timeout)
 {
@@ -227,7 +221,7 @@ void wait_for_completion(struct completion *work)
 	lx_log(DEBUG_COMPLETION, "%p state: %u", work, work->done);
 	__wait_completion(work);
 }
-
+#endif
 
 /*******************
  ** linux/timer.h **
@@ -236,43 +230,44 @@ void wait_for_completion(struct completion *work)
 signed long schedule_timeout_uninterruptible(signed long timeout)
 {
 	lx_log(DEBUG_COMPLETION, "%ld\n", timeout);
-	__wait_event();
+	schedule_timeout(timeout);
 	return 0;
 }
 
-
+#if 0
 int wake_up_process(struct task_struct *tsk)
 {
 	Routine::schedule_all();
 	return 0;
 }
-
+#endif
 
 /***********************
  ** linux/workquque.h **
  ***********************/
 
+#if 0
 int schedule_delayed_work(struct delayed_work *work, unsigned long delay)
 {
 	Work::schedule(work);
 	return 0;
 }
-
-
+#endif
+#if 0
 int schedule_work(struct work_struct *work)
 {
 	Work::schedule(work);
 	return 1;
 }
-
-
+#endif
+#if 0
 bool queue_delayed_work(struct workqueue_struct *wq,
                         struct delayed_work *dwork, unsigned long delay)
 {
 	Work::schedule(dwork);
 	return true;
 }
-
+#endif
 
 /***********************
  ** linux/interrupt.h **
@@ -282,13 +277,12 @@ void tasklet_init(struct tasklet_struct *t, void (*f)(unsigned long), unsigned l
 {
 	t->func    = f;
 	t->data    = d;
-	t->pending = 0;
 }
 
 
 void tasklet_schedule(struct tasklet_struct *tasklet)
 {
-	Work::schedule(tasklet);
+	Lx::Work::work_queue().schedule_tasklet(tasklet);
 }
 
 
@@ -305,7 +299,7 @@ void tasklet_hi_schedule(struct tasklet_struct *tasklet)
  ** linux/workqueue.h **
  ***********************/
 
-struct workqueue_struct *create_singlethread_workqueue(char *)
+struct workqueue_struct *create_singlethread_workqueue(char const *)
 {
 	workqueue_struct *wq = (workqueue_struct *)kzalloc(sizeof(workqueue_struct), 0);
 	return wq;
@@ -318,9 +312,12 @@ struct workqueue_struct *alloc_workqueue(const char *fmt, unsigned int flags,
 	return create_singlethread_workqueue(nullptr);
 }
 
+
 bool queue_work(struct workqueue_struct *wq, struct work_struct *work)
 {
-	Work::schedule(work);
+	Lx::Work::work_queue().schedule(work);
+	Lx::Work::work_queue().unblock();
+
 	return true;
 }
 
@@ -329,9 +326,10 @@ bool queue_work(struct workqueue_struct *wq, struct work_struct *work)
  ** init **
  **********/
 
+#if 0
 void Event::loop()
 {
 	while (true)
 		__wait_event();
 }
-
+#endif

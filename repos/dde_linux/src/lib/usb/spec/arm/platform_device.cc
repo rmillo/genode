@@ -12,11 +12,7 @@
  */
 
 #include <os/attached_io_mem_dataspace.h>
-
-#include <lx/extern_c_begin.h>
 #include <lx_emul.h>
-#include <lx/extern_c_end.h>
-
 
 
 #define to_platform_driver(drv) (container_of((drv), struct platform_driver, \

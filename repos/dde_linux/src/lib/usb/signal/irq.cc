@@ -14,9 +14,7 @@
 #include <signal.h>
 #include <irq_session/client.h>
 
-#include <extern_c_begin.h>
 #include <lx_emul.h>
-#include <extern_c_end.h>
 
 #include <platform.h>
 

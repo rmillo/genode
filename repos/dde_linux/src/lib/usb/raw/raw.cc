@@ -19,10 +19,10 @@
 #include <usb_session/rpc_object.h>
 #include <util/list.h>
 
+#include <lx_emul.h>
 #include <extern_c_begin.h>
 #include <linux/usb.h>
 #include "raw.h"
-#include "lx_emul.h"
 #include <extern_c_end.h>
 #include <signal.h>
 
@@ -444,8 +444,9 @@ class Usb::Worker
 
 		void _wait_for_device()
 		{
-			_wait_event(_device);
-			_wait_event(_device->udev->actconfig);
+			wait_queue_head_t wait;
+			_wait_event(wait, _device);
+			_wait_event(wait, _device->udev->actconfig);
 
 			if (_sigh_ready.valid())
 				Signal_transmitter(_sigh_ready).submit(1);

@@ -23,16 +23,17 @@
 #include "routine.h"
 #include "signal.h"
 #include "platform/lx_mem.h"
-
-#include <extern_c_begin.h>
 #include "lx_emul.h"
-#include <extern_c_end.h>
+
+#include <lx_kit/scheduler.h>
 
 
 namespace Genode {
 	class Slab_backend_alloc;
 	class Slab_alloc;
 }
+
+unsigned long jiffies;
 
 /**
  * Back-end allocator for Genode's slab allocator
@@ -1261,44 +1262,6 @@ int rounddown_pow_of_two(u32 n)
 }
 
 
-/******************
- ** linux/wait.h **
- ******************/
-
-void init_waitqueue_head(wait_queue_head_t *q)
-{
-	q->q = 0;
-}
-
-
-void add_wait_queue(wait_queue_head_t *q, wait_queue_t *wait)
-{
-	if (q->q) {
-		PERR("Non-empty wait queue");
-		return;
-	}
-
-	q->q = wait;
-}
-
-
-void remove_wait_queue(wait_queue_head_t *q, wait_queue_t *wait)
-{
-	if (q->q != wait) {
-		PERR("Remove unkown element from wait queue");
-		return;
-	}
-
-	q->q = 0;
-}
-
-
-int waitqueue_active(wait_queue_head_t *q)
-{
-	return q->q ? 1 : 0;
-}
-
-
 /*****************
  ** linux/nls.h **
  *****************/
@@ -1375,3 +1338,33 @@ int blocking_notifier_call_chain(struct blocking_notifier_head *nh,
 {
 	return raw_notifier_call_chain((struct raw_notifier_head *)nh, val, v);
 }
+
+
+/*******************
+ ** linux/timer.h **
+ *******************/
+
+#include <lx_emul/impl/timer.h>
+
+
+/************************
+ ** linux/completion.h **
+ ************************/
+
+#include <lx_emul/impl/completion.h>
+
+
+/***********************
+ ** linux/workqueue.h **
+ ***********************/
+
+#include <lx_emul/impl/work.h>
+
+
+/******************
+ ** linux/wait.h **
+ ******************/
+
+#include <lx_emul/impl/wait.h>
+
+

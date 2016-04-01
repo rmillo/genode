@@ -73,12 +73,6 @@ class Signal_helper
 		Genode::Signal_transmitter &sender() { return _sender; }
 };
 
-
-namespace Timer
-{
-	void init(Server::Entrypoint &ep);
-}
-
 namespace Irq
 {
 	void init(Server::Entrypoint &ep);
@@ -88,7 +82,6 @@ namespace Irq
 namespace Event
 {
 	void init(Server::Entrypoint &ep);
-	void loop();
 }
 
 namespace Storage
