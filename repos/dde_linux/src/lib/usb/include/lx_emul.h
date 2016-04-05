@@ -142,6 +142,7 @@ typedef uint32_t      u_int32_t;
  */
 typedef unsigned short ushort;
 
+typedef unsigned long phys_addr_t;
 
 #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
 #define BITS_TO_LONGS(nr)       DIV_ROUND_UP(nr, 8 * sizeof(long))
@@ -985,6 +986,7 @@ struct device {
 	const struct device_type      *type;
 	struct device_driver          *driver;
 	void                          *platform_data;
+	u64                           _dma_mask_buf;
 	u64                           *dma_mask; /* needed by usb/hcd.h */
 	u64                            coherent_dma_mask; /* omap driver */
 	struct dev_pm_info             power;
@@ -1545,7 +1547,7 @@ void kunmap(struct page *page);
 
 #include <lx_emul/mmio.h>
 
-void *ioremap(resource_size_t offset, unsigned long size);
+void *ioremap(phys_addr_t addr, unsigned long size);
 void  iounmap(volatile void *addr);
 void *devm_ioremap(struct device *dev, resource_size_t offset,
                    unsigned long size);
@@ -1673,6 +1675,8 @@ struct pci_dev {
 	unsigned short subsystem_device;
 	unsigned int   class;
 	u8             revision;
+	u8             pcie_cap;
+	u16            pcie_flags_reg;
 	struct         device dev;
 	unsigned       current_state;
 };

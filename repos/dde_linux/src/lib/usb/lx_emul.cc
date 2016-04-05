@@ -20,11 +20,11 @@
 #include <util/string.h>
 
 /* Local includes */
-#include "routine.h"
 #include "signal.h"
 #include "platform/lx_mem.h"
 #include "lx_emul.h"
 
+#include <lx_kit/backend_alloc.h>
 #include <lx_kit/irq.h>
 #include <lx_kit/scheduler.h>
 #include <lx_kit/work.h>
@@ -67,7 +67,7 @@ class Genode::Slab_backend_alloc : public Genode::Allocator,
 			}
 
 			try {
-				_ds_cap[_index] = Backend_memory::alloc(P_BLOCK_SIZE, _cached);
+				_ds_cap[_index] = Lx::backend_alloc(P_BLOCK_SIZE, _cached);
 				/* attach at index * V_BLOCK_SIZE */
 				Rm_connection::attach_at(_ds_cap[_index], _index * V_BLOCK_SIZE, P_BLOCK_SIZE, 0);
 
@@ -1070,7 +1070,9 @@ int dma_map_sg_attrs(struct device *dev, struct scatterlist *sg,
 struct task_struct *kthread_run(int (*fn)(void *), void *arg, const char *n, ...)
 {
 	lx_log(DEBUG_THREAD, "Run %s", n);
-	Routine::add(fn, arg, n);
+	PDBG("IMPLEMENT ME!");
+	//Routine::add(fn, arg, n);
+	//TODO: TASK
 	return 0;
 }
 
@@ -1084,7 +1086,9 @@ struct task_struct *kthread_create(int (*threadfn)(void *data),
 	 * 'drivers/usb/storage/usb.c')
 	 */
 	lx_log(DEBUG_THREAD, "Create %s", namefmt);
-	Routine::add(threadfn, data, namefmt);
+	PDBG("IMPLEMENT ME!");
+	//Routine::add(threadfn, data, namefmt);
+	//TODO: TASK
 	return 0;
 }
 

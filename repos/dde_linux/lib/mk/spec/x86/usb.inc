@@ -9,7 +9,7 @@ SRC_C   += $(addprefix net/usb/, usbnet.c ax88179_178a.c)
 #XHCI
 SRC_C += usb/host/xhci-pci.c
 
-SRC_CC  += pci_driver.cc platform.cc
+SRC_CC  += pci_driver.cc pci.cc platform.cc
 
 include $(REP_DIR)/lib/mk/xhci.inc
 include $(REP_DIR)/lib/mk/usb.inc

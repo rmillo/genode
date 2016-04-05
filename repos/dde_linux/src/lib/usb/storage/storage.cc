@@ -18,6 +18,9 @@
 #include <util/list.h>
 
 #include <lx_emul.h>
+
+#include <lx_kit/backend_alloc.h>
+
 #include <extern_c_begin.h>
 #include <storage/scsi.h>
 #include <drivers/usb/storage/usb.h>
@@ -162,10 +165,10 @@ class Storage_device : public Genode::List<Storage_device>::Element,
 		bool dma_enabled() { return true; }
 
 		Genode::Ram_dataspace_capability alloc_dma_buffer(Genode::size_t size) {
-			return Backend_memory::alloc(size, Genode::UNCACHED); }
+			return Lx::backend_alloc(size, Genode::UNCACHED); }
 
 		void free_dma_buffer(Genode::Ram_dataspace_capability cap) {
-			return Backend_memory::free(cap); }
+			return Lx::backend_free(cap); }
 };
 
 

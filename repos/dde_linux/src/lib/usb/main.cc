@@ -23,8 +23,14 @@
 
 /* Local */
 #include <platform.h>
-#include <routine.h>
 #include <signal.h>
+#include <lx_emul.h>
+
+#include <lx_kit/irq.h>
+#include <lx_kit/scheduler.h>
+#include <lx_kit/timer.h>
+#include <lx_kit/work.h>
+
 
 using namespace Genode;
 
@@ -43,16 +49,12 @@ extern "C" void module_raw_driver_init();
 
 extern "C" void start_input_service(void *ep, void *services);
 
-Routine *Routine::_current    = 0;
-Routine *Routine::_dead       = 0;
-Routine *Routine::_main       = 0;
-bool     Routine::_all        = false;
 
 void breakpoint() { PDBG("BREAK"); }
 
 extern "C" int stdout_write(const char *);
 
-static int init(void *s)
+static void run_linux(void *s)
 {
 	Services *services = (Services *)s;
 
@@ -92,7 +94,8 @@ static int init(void *s)
 	/* host controller */
 	platform_hcd_init(services);
 
-	return 0;
+	while (true)
+		Lx::scheduler().current()->block_and_schedule();
 }
 
 
@@ -109,6 +112,19 @@ void start_usb_driver(Server::Entrypoint &ep)
 	if (services.raw)
 		Raw::init(ep, services.raw_report_device_list);
 
+	Lx::Scheduler &sched  = Lx::scheduler();
+	Lx::Timer &timer = Lx::timer(&ep, &jiffies);
+
+	Lx::Irq::irq(&ep, Genode::env()->heap());
+	Lx::Work::work_queue(Genode::env()->heap());
+
+
+	static Lx::Task linux(run_linux, &services, "linux", Lx::Task::PRIORITY_0,
+	                      Lx::scheduler());
+
+	Lx::scheduler().schedule();
+
+#if 0
 	Routine::add(0, 0, "Main", true);
 	Routine::make_main_current();
 
@@ -117,4 +133,5 @@ void start_usb_driver(Server::Entrypoint &ep)
 
 	/* start driver thread */
 	Routine::main();
+#endif
 }

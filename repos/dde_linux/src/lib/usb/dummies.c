@@ -610,11 +610,8 @@ bool in_interrupt(void) { TRACE; return 1; }
  ** linux/pci.h **
  *****************/
 
-int pci_bus_read_config_dword(struct pci_bus *bus, unsigned int devfn, int where, u32 *val) { TRACE; return 0; }
-int pci_bus_write_config_dword(struct pci_bus *bus, unsigned int devfn, int where, u32 val) { TRACE; return 0; }
 
 void *pci_get_drvdata(struct pci_dev *pdev) { TRACE; return NULL; }
-void pci_dev_put(struct pci_dev *dev) { TRACE; }
 struct pci_dev *pci_get_device(unsigned int vendor, unsigned int device,
                                struct pci_dev *from) { TRACE; return NULL; }
 

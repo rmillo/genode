@@ -157,7 +157,7 @@ class Usb::Worker
 		Session::Tx::Sink        *_sink;
 		Device                   *_device      = nullptr;
 		Signal_context_capability _sigh_ready;
-		Routine                  *_routine     = nullptr;
+		//Routine                  *_routine     = nullptr;
 		unsigned                  _p_in_flight = 0;
 		bool                      _device_ready = false;
 
@@ -468,7 +468,8 @@ class Usb::Worker
 				wait_for_completion(&_packet_avail);
 
 				_dispatch();
-				Routine::schedule_all();
+				//Routine::schedule_all();
+				//TODO: check TASK
 			}
 		}
 
@@ -487,17 +488,23 @@ class Usb::Worker
 
 		void start()
 		{
+#if 0
 			if (!_routine) {
 				_routine = Routine::add(run, this, "worker");
 				Routine::schedule_all();
 			}
+#endif
+//TODO: TASK
 		}
 
 		void stop()
 		{
+#if 0
 			if (_routine)
 				Routine::remove(_routine);
 			_routine = nullptr;
+#endif
+//TODO TASK
 		}
 
 		void packet_avail() { ::complete(&_packet_avail); }
