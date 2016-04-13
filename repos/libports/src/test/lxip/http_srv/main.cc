@@ -35,7 +35,7 @@ static void serve(int fd) {
 	/* Read the data from the port, blocking if nothing yet there.
 	   We assume the request (the part we care about) is in one packet */
 	buflen = recv(fd, buf, 1024, 0);
-	PLOG("Packet received!");
+	// PLOG("Packet received!");
 
 	/* Ignore all receive errors */
 	if (buflen > 0) {
@@ -49,7 +49,7 @@ static void serve(int fd) {
 			buf[3] == ' ' &&
 			buf[4] == '/' ) {
 
-			PLOG("Will send response");
+			// PLOG("Will send response");
 
 			/* Send http header */
 			send(fd, http_html_hdr, sizeof(http_html_hdr), 0);
