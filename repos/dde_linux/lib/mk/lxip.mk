@@ -3,7 +3,7 @@ SHARED_LIB = yes
 LIB_DIR     = $(REP_DIR)/src/lib/lxip
 LIB_INC_DIR = $(LIB_DIR)/include
 
-LIBS += lx lxip_include
+LIBS += lxip_include
 
 LX_CONTRIB_DIR := $(call select_from_ports,dde_linux)/src/lib/lxip
 NET_DIR        := $(LX_CONTRIB_DIR)/net
@@ -26,10 +26,12 @@ CC_C_OPT  += -Wno-unused-but-set-variable -Wno-pointer-sign
 CC_C_OPT  += -include $(LIB_INC_DIR)/lx_emul.h
 CC_CXX_OPT = -fpermissive
 
-SRC_CC = dummies.cc env.cc lxcc_emul.cc nic_handler.cc socket_handler.cc \
+SRC_CC = dummies.cc lxcc_emul.cc nic_handler.cc socket_handler.cc \
          timer_handler.cc
 
-SRC_C += driver.c dummies_c.c init.c lxc_emul.c socket.c
+SRC_CC += malloc.cc
+
+SRC_C += driver.c dummies_c.c lxc_emul.c
 
 SRC_C += net/802/p8023.c
 SRC_C += $(addprefix net/core/,$(notdir $(wildcard $(NET_DIR)/core/*.c)))
@@ -51,3 +53,4 @@ net/ethernet/eth.o: SETUP_SUFFIX="_eth"
 vpath %.c $(LX_CONTRIB_DIR)
 vpath %.c $(LIB_DIR)
 vpath %.cc $(LIB_DIR)
+vpath %.cc $(REP_DIR)/src/lx_kit

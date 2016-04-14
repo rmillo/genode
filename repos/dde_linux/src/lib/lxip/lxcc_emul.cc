@@ -5,12 +5,15 @@
  */
 
 /*
- * Copyright (C) 2013 Genode Labs GmbH
+ * Copyright (C) 2013-2016 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
  */
+
+/* Genode includes */
 #include <base/allocator_avl.h>
+#include <base/object_pool.h>
 #include <base/sleep.h>
 #include <base/snprintf.h>
 #include <dataspace/client.h>
@@ -18,415 +21,88 @@
 #include <timer_session/connection.h>
 #include <trace/timestamp.h>
 
-#include <lx/extern_c_begin.h>
+/* local includes */
 #include <lx_emul.h>
-#include <lx/extern_c_end.h>
-
-#include <env.h>
+#include <lx.h>
 
 
-/*
- * VM-area to reserve for back-end allocator
- */
-enum { VM_RESERVATION = 24 * 1024 * 1024 };
+/*********************************
+ ** Lx::Backend_alloc interface **
+ *********************************/
 
-/*
- * TODO: fine tune these
- */
-unsigned long totalram_pages = VM_RESERVATION / PAGE_SIZE;
-unsigned long num_physpages  = totalram_pages;
+#include <lx_kit/backend_alloc.h>
 
-namespace Genode {
-	template <unsigned VM_SIZE> class Slab_backend_alloc;
-	typedef Slab_backend_alloc<VM_RESERVATION> Backend_alloc;
-	class Slab_alloc;
+
+struct Memory_object_base : Genode::Object_pool<Memory_object_base>::Entry
+{
+	Memory_object_base(Genode::Ram_dataspace_capability cap)
+	: Genode::Object_pool<Memory_object_base>::Entry(cap) {}
+
+	void free() { Genode::env()->ram_session()->free(ram_cap()); }
+
+	Genode::Ram_dataspace_capability ram_cap()
+	{
+		using namespace Genode;
+		return reinterpret_cap_cast<Ram_dataspace>(cap());
+	}
+};
+
+
+static Genode::Object_pool<Memory_object_base> memory_pool;
+
+
+Genode::Ram_dataspace_capability
+Lx::backend_alloc(Genode::addr_t size, Genode::Cache_attribute cached)
+{
+	using namespace Genode;
+
+	Genode::Ram_dataspace_capability cap = env()->ram_session()->alloc(size);
+	Memory_object_base *o = new (env()->heap()) Memory_object_base(cap);
+
+	memory_pool.insert(o);
+	return cap;
 }
 
-/**
- * Back-end allocator for Genode's slab allocator
- */
-template <unsigned VM_SIZE>
-class Genode::Slab_backend_alloc : public Genode::Allocator,
-                                   public Genode::Rm_connection
+
+void Lx::backend_free(Genode::Ram_dataspace_capability cap)
 {
-	private:
+	using namespace Genode;
 
-		enum {
-			BLOCK_SIZE = 1024  * 1024,         /* 1 MB */
-			ELEMENTS   = VM_SIZE / BLOCK_SIZE, /* MAX number of dataspaces in VM */
-		};
+	Memory_object_base *object;
+	memory_pool.apply(cap, [&] (Memory_object_base *o) {
+		if (!o) return;
 
-		addr_t                   _base;              /* virt. base address */
-		Cache_attribute          _cached;            /* non-/cached RAM */
-		Ram_dataspace_capability _ds_cap[ELEMENTS];  /* dataspaces to put in VM */
-		addr_t                   _ds_phys[ELEMENTS]; /* physical bases of dataspaces */
-		int                      _index;             /* current index in ds_cap */
-		Allocator_avl            _range;             /* manage allocations */
+		o->free();
+		memory_pool.remove(o);
 
-		bool _alloc_block()
-		{
-			if (_index == ELEMENTS) {
-				PERR("Slab-backend exhausted!");
-				return false;
-			}
-
-			try {
-				_ds_cap[_index] =  Genode::env()->ram_session()->alloc(BLOCK_SIZE, _cached);
-				/* attach at index * BLOCK_SIZE */
-				Rm_connection::attach_at(_ds_cap[_index], _index * BLOCK_SIZE, BLOCK_SIZE, 0);
-
-				/* lookup phys. address */
-				_ds_phys[_index] = Dataspace_client(_ds_cap[_index]).phys_addr();
-			} catch (...) { return false; }
-
-			/* return base + offset in VM area */
-			addr_t block_base = _base + (_index * BLOCK_SIZE);
-			++_index;
-
-			_range.add_range(block_base, BLOCK_SIZE);
-			return true;
-		}
-
-	public:
-
-		Slab_backend_alloc(Cache_attribute cached)
-		: Rm_connection(0, VM_SIZE), _cached(cached), _index(0),
-		  _range(env()->heap())
-		{
-			/* reserver attach us, anywere */
-			_base = env()->rm_session()->attach(dataspace());
-		}
-
-		/**
-		 * Allocate 
-		 */
-		bool alloc(size_t size, void **out_addr) override
-		{
-				bool done = _range.alloc(size, out_addr);
-
-				if (done)
-					return done;
-
-				done = _alloc_block();
-				if (!done) {
-					PERR("Backend allocator exhausted\n");
-					return false;
-				}
-
-				return _range.alloc(size, out_addr);
-		}
-
-		void   free(void *addr, size_t /* size */) override { }
-		size_t overhead(size_t size) const override { return  0; }
-		bool need_size_for_free() const override { return false; }
-
-		/**
-		 * Return phys address for given virtual addr.
-		 */
-		addr_t phys_addr(addr_t addr)
-		{
-			if (addr < _base || addr >= (_base + VM_SIZE))
-				return ~0UL;
-
-			int index = (addr - _base) / BLOCK_SIZE;
-
-			/* physical base of dataspace */
-			addr_t phys = _ds_phys[index];
-
-			if (!phys)
-				return ~0UL;
-
-			/* add offset */
-			phys += (addr - _base - (index * BLOCK_SIZE));
-			return phys;
-		}
-
-		addr_t start() const { return _base; }
-		addr_t end()   const { return _base + VM_SIZE - 1; }
-};
+		object = o; /* save for destroy */
+	});
+	destroy(env()->heap(), object);
+}
 
 
-/**
- * Slab allocator using our back-end allocator
- */
-class Genode::Slab_alloc : public Genode::Slab
+/***************
+ ** Lx printf **
+ ***************/
+
+void lx_printf(char const *fmt, ...) 
 {
-	private:
+	va_list va;
+	va_start(va, fmt);
+	Genode::vprintf(fmt, va); 
+	va_end(va);
+}
 
-		size_t _sz;
 
-		size_t _calculate_block_size(size_t object_size)
-		{
-			size_t block_size = 8 * (object_size + sizeof(Slab_entry)) + sizeof(Slab_block);
-			return align_addr(block_size, 12);
-		}
-
-		uint64_t _alloc_bytes;
-		uint64_t _free_bytes;
-
-	public:
-
-		Slab_alloc(size_t object_size, Backend_alloc *allocator)
-		:
-			Slab(object_size, _calculate_block_size(object_size), 0, allocator),
-			_sz(object_size), _alloc_bytes(0ULL), _free_bytes(0ULL)
-		{ }
-
-	inline addr_t alloc()
-	{
-		addr_t result;
-		bool const ok = Slab::alloc(slab_size(), (void **)&result);
-		_alloc_bytes += ok * _sz;
-		return ok ? result : 0;
-	}
-
-	inline void free(void *addr)
-	{
-		Slab::free(addr);
-		_free_bytes += _sz;
-	}
-
-	inline void dump()
-	{
-		PINF("dump %u: %u (%llu) %u (%llu) %d (%lld)",
-		     _sz, _alloc_bytes / _sz, _alloc_bytes, _free_bytes / _sz, _free_bytes,
-		     _alloc_bytes / _sz - _free_bytes / _sz, _alloc_bytes - _free_bytes);
-	}
-};
-
-/**
- * Memory interface used used for Linux emulation
- */
-class Malloc
-{
-	private:
-
-		enum {
-			SLAB_START_LOG2 = 3,  /* 8 B */
-			SLAB_STOP_LOG2  = 16, /* 64 KB */
-			NUM_SLABS = (SLAB_STOP_LOG2 - SLAB_START_LOG2) + 1,
-		};
-
-		typedef Genode::addr_t addr_t;
-		typedef Genode::Slab_alloc Slab_alloc;
-		typedef Genode::Slab_backend_alloc<VM_RESERVATION> Slab_backend_alloc;
-
-		Slab_backend_alloc *_back_allocator;
-		Slab_alloc         *_allocator[NUM_SLABS]; 
-		bool                _cached; /* cached or un-cached memory */
-		addr_t              _start;  /* VM region of this allocator */
-		addr_t              _end;
-
-		/**
-		 * Set 'value' at 'addr'
-		 */
-		void _set_at(addr_t addr, addr_t value) { *((addr_t *)addr) = value; }
-
-		/**
-		 * Retrieve slab index belonging to given address
-		 */
-		unsigned _slab_index(Genode::addr_t **addr)
-		{
-			using namespace Genode;
-			/* get index */
-			addr_t index = *(*addr - 1);
-
-			/*
-			 * If index large, we use aligned memory, retrieve beginning of slab entry
-			 * and read index from there
-			 */
-			if (index > 32) {
-				*addr = (addr_t *)*(*addr - 1);
-				index = *(*addr - 1);
-			}
-
-			return index;
-		}
-
-		enum { DUMP_COUNT = 0 }; /* 512*1024U */
-		unsigned _alloc_count;
-
-	public:
-
-		Malloc(Slab_backend_alloc *alloc, Genode::Cache_attribute cached)
-		: _back_allocator(alloc), _cached(cached), _start(alloc->start()),
-		  _end(alloc->end()),
-		  _alloc_count(0U)
-		{
-			/* init slab allocators */
-			for (unsigned i = SLAB_START_LOG2; i <= SLAB_STOP_LOG2; i++)
-				_allocator[i - SLAB_START_LOG2] = new (Genode::env()->heap())
-				                                  Slab_alloc(1U << i, alloc);
-		}
-
-		/**
-		 * Alloc in slabs
-		 */
-		void *alloc(Genode::size_t size, int align = 0, Genode::addr_t *phys = 0)
-		{
-			using namespace Genode;
-
-			if (DUMP_COUNT && ++_alloc_count == DUMP_COUNT) {
-				PINF("dump slab allocators:");
-				for (unsigned i = 0; i < NUM_SLABS; i++)
-					_allocator[i]->dump();
-				_alloc_count = 0U;
-			}
-
-			/* += slab index + aligment size */
-			size += sizeof(addr_t) + (align > 2 ? (1 << align) : 0);
-
-			int msb = Genode::log2(size);
-
-			if (size > (1U << msb))
-				msb++;
-
-			if (size < (1U << SLAB_START_LOG2))
-				msb = SLAB_STOP_LOG2;
-
-			if (msb > SLAB_STOP_LOG2) {
-				PERR("Slab too large %u requested %zu cached %d", 1U << msb, size, _cached);
-				return 0;
-			}
-
-			addr_t addr =  _allocator[msb - SLAB_START_LOG2]->alloc();
-			if (!addr) {
-				PERR("Failed to get slab for %u", 1 << msb);
-				return 0;
-			}
-
-			_set_at(addr, msb - SLAB_START_LOG2);
-			addr += sizeof(addr_t);
-
-			if (align > 2) {
-				/* save */
-				addr_t ptr = addr;
-				addr_t align_val = (1U << align);
-				addr_t align_mask = align_val - 1;
-				/* align */
-				addr = (addr + align_val) & ~align_mask;
-				/* write start address before aligned address */
-				_set_at(addr - sizeof(addr_t), ptr);
-			}
-
-			if (phys)
-				*phys = _back_allocator->phys_addr(addr);
-			return (addr_t *)addr;
-		}
-
-		void free(void const *a)
-		{
-			using namespace Genode;
-			addr_t *addr = (addr_t *)a;
-
-			unsigned nr = _slab_index(&addr);
-			_allocator[nr]->free((void *)(addr - 1));
-		}
-
-		size_t slab_size(void const *a)
-		{
-			using namespace Genode;
-			addr_t *addr =(addr_t *)a;
-
-			unsigned nr = _slab_index(&addr);
-			size_t size = 1 << (SLAB_START_LOG2 + nr);
-			size -= (addr_t)a - (addr_t)(addr - 1);
-			return size;
-		}
-
-		Genode::addr_t phys_addr(void *a)
-		{
-			return _back_allocator->phys_addr((addr_t)a);
-		}
-
-		/**
-		 * Belongs given address to this allocator
-		 */
-		bool inside(addr_t const addr) const { return (addr > _start) && (addr <= _end); }
-
-		/**
-		 * Cached memory allocator
-		 */
-		static Malloc *mem()
-		{
-			static Slab_backend_alloc _b(Genode::CACHED);
-			static Malloc _m(&_b, Genode::CACHED);
-			return &_m;
-		}
-};
+void lx_vprintf(char const *fmt, va_list va) {
+	Genode::vprintf(fmt, va); }
 
 
 /*************************************
  ** Memory allocation, linux/slab.h **
  *************************************/
 
-void *kmalloc(size_t size, gfp_t flags)
-{
-	void *addr = Malloc::mem()->alloc(size);
-
-	unsigned long a = (unsigned long)addr;
-
-	if (a & 0x3)
-		PERR("Unaligned kmalloc %lx", a);
-
-//	PDBG("Kmalloc: [%lx-%lx) from %p", a, a + size, __builtin_return_address(0));
-	return addr;
-}
-
-
-void *kzalloc(size_t size, gfp_t flags)
-{
-	void *addr = kmalloc(size, flags);
-	if (addr)
-		Genode::memset(addr, 0, size);
-
-	//PDBG("Kmalloc: [%lx-%lx) from %p", (unsigned)addr, (unsigned)addr + size, __builtin_return_address(0));
-	return addr;
-}
-
-
-void *kcalloc(size_t n, size_t size, gfp_t flags)
-{
-	 if (size != 0 && n > ~0UL / size)
-		return 0;
-
-	return kzalloc(n * size, flags);
-}
-
-void kfree(const void *p)
-{
-	if (!p) return;
-
-	if (Malloc::mem()->inside((Genode::addr_t)p))
-		Malloc::mem()->free(p);
-	else 
-		PWRN("%p is not within our memory range called from %p",
-		     p, __builtin_return_address(0));
-}
-
-
-void *kmalloc_node_track_caller(size_t size, gfp_t flags, int node)
-{
-	return kmalloc(size, 0);
-}
-
-
-void *kzalloc_node(size_t size, gfp_t flags, int node)
-{
-	return kzalloc(size, 0);
-}
-
-
-size_t ksize(const void *p)
-{
-	if (!(Malloc::mem()->inside((Genode::addr_t)p))) {
-		PDBG("%p not in slab allocator", p);
-		return 0;
-	}
-
-	size_t size =  Malloc::mem()->slab_size(p);
-	return size;
-}
+#include <lx_emul/impl/slab.h>
 
 
 void *alloc_large_system_hash(const char *tablename,
@@ -465,58 +141,9 @@ void *kmalloc_array(size_t n, size_t size, gfp_t flags)
  ** linux/slab.h   **
  ********************/
 
-struct kmem_cache
-{
-	const char *name; /* cache name */
-	unsigned    size; /* object size */
-};
-
-
-struct kmem_cache *kmem_cache_create(const char *name, size_t size, size_t align,
-                                     unsigned long falgs, void (*ctor)(void *))
-{
-	lx_log(DEBUG_SLAB, "\"%s\" obj_size=%zd", name, size);
-
-	struct kmem_cache *cache;
-
-	if (!name) {
-		pr_info("kmem_cache name required\n");
-		return 0;
-	}
-
-	cache = (struct kmem_cache *)kmalloc(sizeof(*cache), 0);
-	if (!cache) {
-		pr_crit("No memory for slab cache\n");
-		return 0;
-	}
-
-	cache->name = name;
-	cache->size = size;
-
-	return cache;
-}
-
-
 void *kmem_cache_alloc_node(struct kmem_cache *cache, gfp_t flags, int node)
 {
-	void *objp = kmalloc(cache->size, 0);
-	lx_log(DEBUG_SLAB, "\"%s\" alloc obj_size=%u objp=%p",  cache->name,cache->size, objp);
-	return objp;
-}
-
-
-void *kmem_cache_alloc(struct kmem_cache *cache, gfp_t flags)
-{
-	void *objp = kmalloc(cache->size, 0);
-	lx_log(DEBUG_SLAB, "\"%s\" alloc obj_size=%u objp=%p",  cache->name,cache->size, objp);
-	return objp;
-}
-
-
-void kmem_cache_free(struct kmem_cache *cache, void *objp)
-{
-	lx_log(DEBUG_SLAB, "\"%s\" (%p)", cache->name, objp);
-	kfree(objp);
+	return (void*)cache->alloc();
 }
 
 
@@ -562,6 +189,7 @@ char *strchr(const char *p, int ch)
 	return 0;
 }
 
+
 char *strnchr(const char *p, size_t count, int ch)
 {
 	char c;
@@ -576,6 +204,7 @@ char *strnchr(const char *p, size_t count, int ch)
 	return 0;
 }
 
+
 size_t strnlen(const char *s, size_t maxlen)
 {
 	size_t c;
@@ -586,14 +215,19 @@ size_t strnlen(const char *s, size_t maxlen)
 	return maxlen;
 }
 
+
 size_t strlen(const char *s) { return Genode::strlen(s); }
-int    strcmp(const char *s1, const char *s2) { return Genode::strcmp(s1, s2); }
-int    strncmp(const char *s1, const char *s2, size_t len) { 
+
+
+int strcmp(const char *s1, const char *s2) { return Genode::strcmp(s1, s2); }
+
+
+int strncmp(const char *s1, const char *s2, size_t len) {
 	return Genode::strcmp(s1, s2, len); }
 
-int    memcmp(const void *p0, const void *p1, size_t size) {
-	return Genode::memcmp(p0, p1, size); }
 
+int memcmp(const void *p0, const void *p1, size_t size) {
+	return Genode::memcmp(p0, p1, size); }
 
 
 int snprintf(char *str, size_t size, const char *format, ...)
@@ -602,9 +236,7 @@ int snprintf(char *str, size_t size, const char *format, ...)
 	va_start(list, format);
 
 	Genode::String_console sc(str, size);
-
 	sc.vprintf(format, list);
-
 	va_end(list);
 
 	return sc.len();
@@ -624,40 +256,31 @@ size_t strlcpy(char *dest, const char *src, size_t size)
 }
 
 
-void *kmemdup(const void *src, size_t len, gfp_t gfp)
-{
-	void *ptr = kmalloc(len, gfp);
-	Genode::memcpy(ptr, src, len);
-	return ptr;
-}
-
-
-void *genode_memcpy(void *d, const void *s, size_t n)
+void *memcpy(void *d, const void *s, size_t n)
 {
 	return Genode::memcpy(d, s, n);
 }
-
-
-/******************
- ** linux/log2.h **
- ******************/
-
-unsigned long ilog2(unsigned long n) { return Genode::log2<unsigned long>(n); }
-
-
-int rounddown_pow_of_two(u32 n) { return 1U << Genode::log2(n); }
 
 
 /*******************
  ** linux/sched.h **
  *******************/
 
+static Genode::Signal_receiver *_sig_rec;
+
+
+void Lx::event_init(Genode::Signal_receiver &sig_rec)
+{
+	_sig_rec = &sig_rec;
+}
+
+
 struct Timeout : Genode::Signal_dispatcher<Timeout>
 {
 	void handle(unsigned) { update_jiffies(); }
 
 	Timeout(Timer::Session_client &timer, signed long msec)
-	: Signal_dispatcher<Timeout>(*Net::Env::receiver(), *this, &Timeout::handle)
+	: Signal_dispatcher<Timeout>(*_sig_rec, *this, &Timeout::handle)
 	{
 		if (msec > 0) {
 			timer.sigh(*this);
@@ -673,7 +296,7 @@ static void __wait_event(signed long timeout)
 	Timeout to(timer, timeout);
 
 	/* dispatch signal */
-	Genode::Signal s = Net::Env::receiver()->wait_for_signal();
+	Genode::Signal s = _sig_rec->wait_for_signal();
 	static_cast<Genode::Signal_dispatcher_base *>(s.context())->dispatch(s.num());
 }
 
@@ -692,6 +315,7 @@ signed long schedule_timeout(signed long timeout)
 	return timeout < 0 ? 0 : timeout;
 }
 
+
 void poll_wait(struct file * filp, wait_queue_head_t * wait_address, poll_table *p)
 {
 	__wait_event(0);
@@ -706,6 +330,7 @@ unsigned long get_seconds(void)
 {
 	return jiffies / HZ;
 }
+
 
 /*****************
  ** linux/gfp.h **
@@ -764,7 +389,9 @@ class Avl_page : public Genode::Avl_node<Avl_page>
 		}
 };
 
+
 static Genode::Avl_tree<Avl_page> tree;
+
 
 struct page *alloc_pages(gfp_t gfp_mask, unsigned int order)
 {
@@ -776,6 +403,7 @@ struct page *alloc_pages(gfp_t gfp_mask, unsigned int order)
 
 	return p->page();
 }
+
 
 void *__alloc_page_frag(struct page_frag_cache *nc,
                         unsigned int fragsz, gfp_t gfp_mask)
@@ -1004,3 +632,10 @@ size_t csum_and_copy_to_iter(void *addr, size_t bytes, __wsum *csum, struct iov_
 
 	return bytes;
 }
+
+
+/******************
+ ** linux/wait.h **
+ ******************/
+
+void __wake_up(wait_queue_head_t *q, bool all) { }

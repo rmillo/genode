@@ -1,6 +1,11 @@
 linux-4.4.3/drivers/net/loopback.c
-linux-4.4.3/include/asm-generic/bitops/non-atomic.h
 linux-4.4.3/include/asm-generic/atomic64.h
+linux-4.4.3/include/asm-generic/bitops/__ffs.h
+linux-4.4.3/include/asm-generic/bitops/__fls.h
+linux-4.4.3/include/asm-generic/bitops/ffs.h
+linux-4.4.3/include/asm-generic/bitops/fls.h
+linux-4.4.3/include/asm-generic/bitops/fls64.h
+linux-4.4.3/include/asm-generic/bitops/non-atomic.h
 linux-4.4.3/include/linux/errqueue.h
 linux-4.4.3/include/linux/etherdevice.h
 linux-4.4.3/include/linux/ethtool.h
@@ -12,6 +17,7 @@ linux-4.4.3/include/linux/inetdevice.h
 linux-4.4.3/include/linux/jhash.h
 linux-4.4.3/include/linux/list.h
 linux-4.4.3/include/linux/list_nulls.h
+linux-4.4.3/include/linux/log2.h
 linux-4.4.3/include/linux/netdev_features.h
 linux-4.4.3/include/linux/netdevice.h
 linux-4.4.3/include/linux/net.h

@@ -8,7 +8,7 @@
  */
 
 /*
- * Copyright (C) 2012-2013 Genode Labs GmbH
+ * Copyright (C) 2012-2016 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
@@ -17,105 +17,114 @@
 #ifndef _LX_EMUL_H_
 #define _LX_EMUL_H_
 
-#include <lx/lx.h>
+#include <stdarg.h>
+#include <base/fixed_stdint.h>
+
+#include <lx_emul/extern_c_begin.h>
 
 #define DEBUG_PRINTK 1
 #define DEBUG_SLAB   0
 #define DEBUG_TIMER  0
-#define DEBUG_CONG   0
 #define DEBUG_LEVEL  0
 
 #define KBUILD_MODNAME "mod-noname"
+
+
+/*****************
+ ** asm/param.h **
+ *****************/
+
+enum { HZ = 100UL };
+
+
+/******************
+ ** asm/atomic.h **
+ ******************/
+
+#include <lx_emul/atomic.h>
 
 
 /*******************
  ** linux/types.h **
  *******************/
 
-typedef uint32_t uint;
-
-typedef int8_t   s8;
-typedef int16_t  s16;
-typedef int32_t  s32;
-typedef int64_t  s64;
-
-typedef uint8_t  u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef uint64_t u64;
-
-
-
-typedef uint8_t  __u8;
-typedef uint16_t __u16;
-typedef uint32_t __u32;
-typedef uint64_t __u64;
+#include <lx_emul/types.h>
 
 typedef __u8  u_int8_t;
-
-typedef int16_t  __s16;
-typedef int32_t  __s32;
-typedef int64_t  __s64;
 
 typedef __u16 __le16;
 typedef __u32 __le32;
 typedef __u64 __le64;
 
-typedef __u16 __be16;
-typedef __u32 __be32;
 typedef __u64 __be64;
 
 typedef __u16 __sum16;
 typedef __u32 __wsum;
 
-typedef unsigned       gfp_t;
-typedef unsigned long  dma_addr_t;
-typedef long long      loff_t;
-typedef size_t       __kernel_size_t;
-typedef long         __kernel_time_t;
-typedef long         __kernel_suseconds_t;
-typedef int            pid_t;
-typedef long           ssize_t;
-typedef unsigned short umode_t;
-typedef unsigned long  clock_t;
-typedef int            pid_t;
-typedef unsigned int   uid_t;
-typedef unsigned int   gid_t;
-typedef unsigned short mode_t;
-
 #define __aligned_u64 __u64 __attribute__((aligned(8)))
 
-#define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
-#define BITS_TO_LONGS(nr)       DIV_ROUND_UP(nr, 8 * sizeof(long))
 #define DECLARE_BITMAP(name,bits) \
 	unsigned long name[BITS_TO_LONGS(bits)]
 
-struct list_head {
-	struct list_head *next, *prev;
-};
 
-struct hlist_head {
-	struct hlist_node *first;
-};
+/**********************
+ ** linux/compiler.h **
+ **********************/
 
-struct hlist_node {
-	struct hlist_node *next, **pprev;
-};
+#include <lx_emul/compiler.h>
 
-#ifndef __cplusplus
-typedef _Bool bool;
-enum { true = 1, false = 0 };
-#endif /* __cplusplus */
 
-#ifndef NULL
-#ifdef __cplusplus
-#define NULL nullptr
-#else
-#define NULL ((void *)0)
-#endif /* __cplusplus */
-#endif /* NULL */
+/**************************
+ ** asm-generic/bitops.h **
+ **************************/
 
-#define __bitwise
+#include <lx_emul/bitops.h>
+
+#define ffz(x) ffs(~(x))
+
+/*******************************
+ ** asm-generic/bitops/find.h **
+ *******************************/
+
+unsigned long find_first_zero_bit(unsigned long const *addr, unsigned long size);
+
+static inline unsigned long find_next_bit(const unsigned long *addr, unsigned long size,
+		unsigned long offset)
+{
+	unsigned long i  = offset / BITS_PER_LONG;
+	offset -= (i * BITS_PER_LONG);
+
+	for (; offset < size; offset++)
+		if (addr[i] & (1UL << offset))
+			return offset;
+
+	return size;
+}
+
+#define find_first_bit(addr, size) find_next_bit((addr), (size), 0)
+
+
+/****************************
+ ** bitops/const_hweight.h **
+ ****************************/
+
+static inline unsigned int hweight32(unsigned int w)
+{
+	w -= (w >> 1) & 0x55555555;
+	w  = (w & 0x33333333) + ((w >> 2) & 0x33333333);
+	w  = (w + (w >> 4)) & 0x0f0f0f0f;
+	return (w * 0x01010101) >> 24;
+
+}
+
+unsigned int hweight64(__u64 w);
+
+
+/****************************
+ ** asm-generic/getorder.h **
+ ****************************/
+
+int get_order(unsigned long size);
 
 
 /************************
@@ -133,152 +142,47 @@ struct callback_head {
  ** linux/errno.h and friends **
  *******************************/
 
-/**
- * Error codes
- *
- * Note that the codes do not correspond to those of the Linux kernel.
- */
-enum {
-	/*
-	 * The following numbers correspond to FreeBSD
-	 */
-	EPERM           = 1,
-	ENOENT          = 2,
-	ESRCH           = 3,
-	EINTR           = 4,
-	EIO             = 5,
-	ENXIO           = 6,
-	E2BIG           = 7,
-	ENOMEM          = 12,
-	EACCES          = 13,
-	EFAULT          = 14,
-	EBUSY           = 16,
-	EEXIST          = 17,
-	EXDEV           = 18,
-	ENODEV          = 19,
-	EINVAL          = 22,
-	ENFILE          = 23,
-	EFBIG           = 27,
-	ESPIPE          = 29,
-	EPIPE           = 32,
-	EDOM            = 33,
-	ERANGE          = 34,
-	EAGAIN          = 35,
-	EINPROGRESS     = 36,
-	EALREADY        = 37,
-	ENOTSOCK        = 38,
-	EDESTADDRREQ    = 39,
-	EMSGSIZE        = 40,
-	ENOPROTOOPT     = 42,
-	EPROTONOSUPPORT = 43,
-	ESOCKTNOSUPPORT = 44,
-	EOPNOTSUPP      = 45,
-	EPFNOSUPPORT    = 46,
-	EAFNOSUPPORT    = 47,
-	EADDRINUSE      = 48,
-	EADDRNOTAVAIL   = 49,
-	ENETDOWN        = 50,
-	ENETUNREACH     = 51,
-	ECONNABORTED    = 53,
-	ECONNRESET      = 54,
-	ENOBUFS         = 55,
-	EISCONN         = 56,
-	ENOTCONN        = 57,
-	ETIMEDOUT       = 60,
-	ECONNREFUSED    = 61,
-	EHOSTDOWN       = 64,
-	EHOSTUNREACH    = 65,
-	ENOSYS          = 78,
-	ENOMSG          = 83,
-	EPROTO          = 92,
-	EOVERFLOW       = 84,
-
-	/*
-	 * The following numbers correspond to nothing
-	 */
-	EREMOTEIO       = 200,
-	ERESTARTSYS     = 201,
-	ENODATA         = 202,
-	ETOOSMALL       = 203,
-	ENOIOCTLCMD     = 204,
-	ENONET          = 205,
-
-	MAX_ERRNO       = 4095,
-};
-
-
-/******************
- ** linux/init.h **
- ******************/
-
-#define __init
-#define __initdata
-#define __exit
-
-#define _SETUP_CONCAT(a, b) __##a##b
-#define SETUP_CONCAT(a, b) _SETUP_CONCAT(a, b)
-#define __setup(str, fn) void SETUP_CONCAT(fn, SETUP_SUFFIX)(void *addrs) { fn(addrs); }
-
-/* these must be called by us during initialization */
-#define  core_initcall(fn)   void core_##fn(void) { fn(); }
-#define  subsys_initcall(fn) void subsys_##fn(void) { fn(); }
-#define  fs_initcall(fn)     void fs_##fn(void) { fn(); }
-#define  late_initcall(fn)   void late_##fn(void) { fn(); }
+#include <lx_emul/errno.h>
 
 
 /********************
  ** linux/module.h **
  ********************/
 
-#define EXPORT_SYMBOL(x)
-#define EXPORT_SYMBOL_GPL(x)
-#define MODULE_LICENSE(x)
-#define MODULE_NAME_LEN (64 - sizeof(long))
-#define MODULE_ALIAS(name)
-#define MODULE_AUTHOR(name)
-#define MODULE_DESCRIPTION(desc)
-#define MODULE_VERSION(version)
-#define THIS_MODULE 0
+#include <lx_emul/module.h>
+
+#ifdef __setup
+#undef __setup
+#endif
+
+#define __setup(str, fn) void SETUP_CONCAT(fn, SETUP_SUFFIX)(void *addrs) { fn(addrs); }
 
 
-struct module;
-#define module_init(fn) void module_##fn(void) { fn(); }
-#define module_exit(fn) void module_exit_##fn(void) { fn(); }
+/******************
+ ** linux/init.h **
+ ******************/
 
-void module_put(struct module *);
-void __module_get(struct module *module);
-int try_module_get(struct module *);
+#define __initdata
+#define  fs_initcall(fn)     void fs_##fn(void) { fn(); }
+#define  late_initcall(fn)   void late_##fn(void) { fn(); }
 
 
 /*******************
  ** asm/barrier.h **
  *******************/
 
-#define mb()  asm volatile ("": : :"memory")
-#define smp_mb() mb()
-#define smp_rmb() mb()
-#define smp_wmb() mb()
-
-static inline void barrier() { asm volatile ("": : :"memory"); }
+#include <lx_emul/barrier.h>
 
 #define smp_load_acquire(p)     *(p)
 #define smp_store_release(p, v) *(p) = v;
 #define smp_mb__before_atomic() mb()
-
-
-/*************************
- ** linux/moduleparam.h **
- *************************/
-
-#define module_param(name, type, perm)
-#define MODULE_PARM_DESC(_parm, desc)
+#define smp_mb__after_atomic()  mb()
 
 
 /*********************
  ** linux/kconfig.h **
  *********************/
 
-#define IS_ENABLED(x) x
 #define CONFIG_DEFAULT_TCP_CONG "cubic"
 
 
@@ -286,28 +190,13 @@ static inline void barrier() { asm volatile ("": : :"memory"); }
  ** linux/compiler.h **
  **********************/
 
-#define likely
-#define unlikely
+#include <lx_emul/compiler.h>
 
-#define __user
-#define __rcu
-#define __percpu
-#define __must_check
-#define __force
 #define __deprecated
-
-#define __releases(x)
-#define __acquires(x)
 
 #define __aligned(x)  __attribute__((aligned(x)))
 
 #define noinline_for_stack
-#define noinline     __attribute__((noinline))
-
-#define __printf(a, b) __attribute__((format(printf, a, b)))
-#define __attribute_const__  __attribute__((__const__))
-
-#define ACCESS_ONCE(x) (*(volatile typeof(x) *)&(x))
 
 static inline void __write_once_size(volatile void *p, void *res, int size)
 {
@@ -356,81 +245,70 @@ static inline void __read_once_size(const volatile void *p, void *res, int size)
 #define __HAVE_BUILTIN_BSWAP64__
 
 
+/***************
+ ** asm/bug.h **
+ ***************/
+
+#include <lx_emul/bug.h>
+
+
+/********************
+ ** linux/printk.h **
+ ********************/
+
+#include <lx_emul/printf.h>
+
+#define pr_crit(fmt, ...)       lx_printf(KERN_CRIT fmt, ##__VA_ARGS__)
+#define pr_emerg(fmt, ...)      lx_printf(KERN_EMERG fmt, ##__VA_ARGS__)
+#define pr_err(fmt, ...)        lx_printf(KERN_ERR fmt, ##__VA_ARGS__)
+#define pr_warn(fmt, ...)       lx_printf(KERN_WARN fmt, ##__VA_ARGS__)
+#define pr_warn_once(fmt, ...)  lx_printf(KERN_WARN fmt, ##__VA_ARGS__)
+#define pr_info(fmt, ...)       lx_printf(KERN_INFO fmt, ##__VA_ARGS__)
+#define pr_notice(fmt, ...)     lx_printf(KERN_NOTICE fmt, ##__VA_ARGS__)
+#define pr_cont(fmt, ...)       lx_printf(KERN_CONT fmt, ##__VA_ARGS__)
+#define pr_info_once(fmt, ...)  lx_printf(KERN_INFO fmt, ##__VA_ARGS__)
+#define pr_err_once(fmt, ...)   lx_printf(KERN_ERR fmt, ##__VA_ARGS__)
+
+#if DEBUG_LEVEL
+#define pr_debug(fmt, ...)  lx_printf(KERN_DEBUG fmt, ##__VA_ARGS__)
+#else
+#define pr_debug(fmt, ...)
+#endif
+
+struct va_format
+{
+	const char *fmt;
+	va_list    *va;
+};
+
+
+static inline __printf(1, 2) int no_printk(const char *fmt, ...) { return 0; }
+
+
 /********************
  ** linux/kernel.h **
  ********************/
 
-#define KERN_DEBUG  "DEBUG: "
-#define KERN_INFO   "INFO: "
-#define KERN_ERR    "ERROR: "
-#define KERN_CRIT   "CRTITCAL: "
-#define KERN_NOTICE "NOTICE: "
-#define KERN_EMERG  "EMERG: "
-#define KERN_ALERT  "ALERT: "
+#include <lx_emul/kernel.h>
+
 #define KERN_CONT   ""
-#define KERN_WARN   "WARNING: "
 
 #define FIELD_SIZEOF(t, f) (sizeof(((t*)0)->f))
 
-#define container_of(ptr, type, member) ({ \
-	const typeof( ((type *)0)->member ) *__mptr = (ptr); \
-	(type *)( (char *)__mptr - offsetof(type,member) );})
-
-/* normally provided by linux/stddef.h, needed by linux/list.h */
-#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
-
-#define ALIGN(x, a) x
 #define PAGE_ALIGN(addr) ALIGN(addr, PAGE_SIZE)
-#define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
 
 #define SIZE_MAX (~(size_t)0)
-
-#define USHRT_MAX ((u16)(~0U))
-#define INT_MAX   ((int)(~0U>>1))
-#define INT_MIN   (-INT_MAX - 1)
-#define UINT_MAX  (~0U)
 
 #define U32_MAX  ((u32)~0U)
 #define S32_MAX  ((s32)(U32_MAX>>1))
 #define S32_MIN  ((s32)(-S32_MAX - 1))
 
-static inline size_t min(size_t a, size_t b) {
-	return a < b ? a : b; }
-
-#define max(x, y) ({                      \
-	typeof(x) _max1 = (x);                  \
-	typeof(y) _max2 = (y);                  \
-	(void) (&_max1 == &_max2);              \
-	_max1 > _max2 ? _max1 : _max2; })
-
-#define min_t(type, x, y) ({ \
-	type __min1 = (x); \
-	type __min2 = (y); \
-	__min1 < __min2 ? __min1: __min2; })
-
-#define max_t(type, x, y) ({ \
-	type __max1 = (x); \
-	type __max2 = (y); \
-	__max1 > __max2 ? __max1: __max2; })
-
-#define swap(a, b) ({ \
-	typeof(a) __tmp = (a); \
-	(a) = (b); \
-	(b) = __tmp;  })
-
 #define PTR_ALIGN(p, a) ({              \
-  unsigned long _p = (unsigned long)p;  \
-  _p = (_p + a - 1) & ~(a - 1);         \
-  p = (typeof(p))_p;                    \
+	unsigned long _p = (unsigned long)p;  \
+	_p = (_p + a - 1) & ~(a - 1);         \
+	p = (typeof(p))_p;                    \
 	p;                                    \
 })
-
-#define BUILD_BUG_ON(condition)
-
-#define _RET_IP_  (unsigned long)__builtin_return_address(0)
-
-void might_sleep();
-#define might_sleep_if(cond) do { if (cond) might_sleep(); } while (0)
 
 enum { SPRINTF_STR_LEN = 64 };
 
@@ -450,52 +328,27 @@ int   scnprintf(char *, size_t, const char *, ...);
 
 #define clamp(val, lo, hi) min((typeof(val))max(val, lo), hi)
 
-//char *kasprintf(gfp_t gfp, const char *fmt, ...);
-
 char *get_options(const char *str, int nints, int *ints);
 int   hex_to_bin(char);
 
+u32 reciprocal_scale(u32 val, u32 ep_ro);
 
-/*****************
- ** asm/param.h **
- *****************/
+#define sched_annotate_sleep() do { } while (0)
 
-#define HZ 100UL
+int kstrtou8(const char *s, unsigned int base, u8 *res);
 
 
 /*********************
  ** linux/jiffies.h **
  *********************/
 
-extern unsigned long jiffies;
+#include <lx_emul/jiffies.h>
 
 enum {
 	INITIAL_JIFFIES = 0,
-	JIFFIES_TICK_MS = 1000/HZ,
-	JIFFIES_TICK_US = 1000*1000/HZ,
 };
 
-static inline unsigned int jiffies_to_msecs(const unsigned long j) { return j * JIFFIES_TICK_MS; }
 static inline unsigned int jiffies_to_usecs(const unsigned long j) { return j * JIFFIES_TICK_US; }
-
-static inline unsigned long msecs_to_jiffies(const unsigned int m) { return m / JIFFIES_TICK_MS; }
-static inline unsigned long usecs_to_jiffies(const unsigned int u) { return u / JIFFIES_TICK_US; }
-
-long time_after(long a, long b);
-long time_after_eq(long a, long b);
-
-static inline long time_before(long a, long b) { return time_after(b, a); }
-static inline long time_before_eq(long a, long b) { return time_after_eq(b ,a); }
-
-static inline clock_t jiffies_to_clock_t(unsigned long j)
-{
-	return j / HZ; /* XXX not sure if this is enough */
-}
-
-static inline clock_t jiffies_delta_to_clock_t(long delta)
-{
-	return jiffies_to_clock_t(max(0L, delta));
-}
 
 void update_jiffies(void);
 
@@ -513,6 +366,7 @@ int request_module(const char *name, ...);
 
 enum { SIGPIPE };
 
+
 /********************
  ** linux/bitmap.h **
  ********************/
@@ -528,24 +382,6 @@ void bitmap_zero(unsigned long *dst, int nbits);
 #define __ismask(x) (_ctype[(int)(unsigned char)(x)])
 #define isspace(c) ((unsigned char)c == 0x20U)
 
-/*****************
- ** linux/err.h **
- *****************/
-
-#define IS_ERR_VALUE(x) unlikely((x) >= (unsigned long)-MAX_ERRNO)
-
-static inline bool IS_ERR(void const *ptr) {
-	return (unsigned long)(ptr) > (unsigned long)(-1000); }
-
-static inline void * ERR_PTR(long error) {
-	return (void *) error;
-}
-
-static inline long IS_ERR_OR_NULL(const void *ptr) {
-	return !ptr || IS_ERR_VALUE((unsigned long)ptr); }
-
-static inline long PTR_ERR(const void *ptr) { return (long) ptr; }
-
 
 /*******************************
  ** asm-generic/scatterlist.h **
@@ -553,6 +389,7 @@ static inline long PTR_ERR(const void *ptr) { return (long) ptr; }
 
 struct scatterlist
 {
+	unsigned dummy;
 };
 
 struct page;
@@ -561,57 +398,6 @@ void sg_mark_end(struct scatterlist *sg);
 void sg_set_buf(struct scatterlist *, const void *, unsigned int);
 void sg_set_page(struct scatterlist *, struct page *, unsigned int,
                  unsigned int);
-
-/********************
- ** linux/printk.h **
- ********************/
-
-#define KERN_WARNING KERN_WARN
-
-#define pr_crit(fmt, ...)    lx_printf(KERN_CRIT fmt, ##__VA_ARGS__)
-#define pr_emerg(fmt, ...)   lx_printf(KERN_EMERG fmt, ##__VA_ARGS__)
-#define pr_err(fmt, ...)     lx_printf(KERN_ERR fmt, ##__VA_ARGS__)
-#define pr_warn(fmt, ...)    lx_printf(KERN_WARN fmt, ##__VA_ARGS__)
-#define pr_info(fmt, ...)    lx_printf(KERN_INFO fmt, ##__VA_ARGS__)
-#define pr_notice(fmt, ...)  printk(KERN_NOTICE fmt, ##__VA_ARGS__)
-#define pr_cont(fmt, ...)    printk(KERN_CONT fmt, ##__VA_ARGS__)
-
-#define pr_info_once(fmt, ...)  printk(KERN_INFO fmt, ##__VA_ARGS__)
-#define pr_err_once(fmt, ...)   printk(KERN_ERR fmt, ##__VA_ARGS__)
-
-#if DEBUG_LEVEL
-#define pr_debug(fmt, ...)   printk(KERN_DEBUG fmt, ##__VA_ARGS__)
-#else
-#define pr_debug(fmt, ...)
-#endif
-
-struct va_format
-{
-	const char *fmt;
-	va_list *va;
-};
-
-static inline int _printk(const char *fmt, ...)
-{
-	va_list args;
-	va_start(args, fmt);
-	lx_vprintf(fmt, args);
-	va_end(args);
-	return 0;
-}
-
-#if DEBUG_PRINTK
-#define printk  _printk
-#define vprintk lx_vprintf
-#else
-
-static inline int printk(const char *fmt, ...)
-{
-	return 0;
-}
-
-#define vprintk(...)
-#endif
 
 
 /******************
@@ -638,18 +424,7 @@ void *current_text_addr(void);
  ** linux/byteorder/little_endian.h **
  *************************************/
 
-#include <uapi/linux/byteorder/little_endian.h>
-
-
-/*******************************
- ** linux/byteorder/generic.h **
- *******************************/
-
-#define cpu_to_be16  __cpu_to_be16
-#define cpu_to_be32  __cpu_to_be32
-
-#define be16_to_cpup __be16_to_cpup
-#define be32_to_cpup __be32_to_cpup
+#include <lx_emul/byteorder.h>
 
 #define htons(x) __cpu_to_be16(x)
 #define ntohs(x) __be16_to_cpu(x)
@@ -661,22 +436,17 @@ void *current_text_addr(void);
  ** linux/unaligned/access_ok.h **
  *********************************/
 
-static inline u16 get_unaligned_be16(const void *p)
-{
-	return be16_to_cpup((__be16 *)p);
-}
+static inline u16 get_unaligned_be16(const void *p) {
+	return be16_to_cpup((__be16 *)p); }
 
-static inline u32 get_unaligned_be32(const void *p)
-{
-	return be32_to_cpup((__be32 *)p);
-}
+static inline u32 get_unaligned_be32(const void *p) {
+	return be32_to_cpup((__be32 *)p); }
 
-static inline u32 __get_unaligned_cpu32(const void *p)
-{
-	return p;
-}
+static inline u32 __get_unaligned_cpu32(const void *p) {
+	return *(u32*)p; }
 
-void put_unaligned_be32(u32 val, void *);
+static inline void put_unaligned_be32(u32 val, void *p) {
+	*((__le32 *)p) = cpu_to_be32(val); }
 
 
 /*********************
@@ -697,100 +467,6 @@ struct sysinfo
 };
 
 
-/*******************
- ** asm/cmpxchg.h **
- *******************/
-
-#define cmpxchg(ptr, o, n) ({ \
-	typeof(*ptr) prev = *ptr; \
-	*ptr = (*ptr == o) ? n : *ptr; \
-	prev;\
-})
-
-#define __xchg(v, ptr, s) ({ \
-	typeof(*ptr) prev = *ptr; \
-	*ptr = v; \
-	prev; \
-})
-
-#define xchg(ptr, x) \
-	((__typeof__(*(ptr))) __xchg((unsigned long)(x), (ptr), sizeof(*(ptr))))
-
-
-/******************
- ** asm/atomic.h **
- ******************/
-
-#define ATOMIC_INIT(i) { (i) }
-
-typedef struct atomic { unsigned long counter; } atomic_t;
-typedef atomic_t atomic_long_t;
-
-static inline unsigned int atomic_read(const atomic_t *p) { return p->counter; }
-static inline void atomic_set(atomic_t *p, int i) { p->counter = i; }
-static inline void atomic_sub(int i, atomic_t *p) { p->counter -= i; }
-static inline int atomic_sub_return(int i, atomic_t *p) { p->counter -= i; return p->counter; }
-static inline int atomic_sub_and_test(int i, atomic_t *p) { return atomic_sub_return(i, p) == 0; }
-
-static inline int  atomic_dec_return(atomic_t *p) { return atomic_sub_return(1, p); }
-static inline int  atomic_dec_and_test(atomic_t *p) { return atomic_sub_return(1, p) == 0; }
-static inline void atomic_dec(atomic_t *p) { atomic_sub_return(1, p); }
-
-
-static inline void atomic_inc(atomic_t *p) { p->counter++; }
-static inline int  atomic_inc_return(atomic_t *p) { return p->counter++; }
-static inline int atomic_inc_not_zero(atomic_t *p) { return p->counter ? p->counter++ : 0; }
-
-static inline void atomic_add(int i, atomic_t *p) { p->counter += i; }
-static inline unsigned int  atomic_add_return(int i, atomic_t *p) { p->counter += i; return p->counter; }
-
-
-static inline void atomic_long_inc(atomic_long_t *p) { p->counter++; }
-static inline void atomic_long_sub(int i, atomic_long_t *p) { atomic_sub(i, p); }
-static inline long atomic_long_add_return(long i, atomic_long_t *p) {
-	atomic_add(i, p); return p->counter; }
-static inline long atomic_long_read(atomic_long_t *p) { return (long)atomic_read(p); }
-
-static inline int atomic_cmpxchg(atomic_t *v, int old, int n)
-{
-	return cmpxchg(&v->counter, old, n);
-}
-
-
-static inline int atomic_inc_not_zero_hint(atomic_t *v, int hint)
-{
-	int val, c = hint;
-
-	/* sanity test, should be removed by compiler if hint is a constant */
-	if (!hint)
-		return atomic_inc_not_zero(v);
-
-	do {
-		val = atomic_cmpxchg(v, c, c + 1);
-		if (val == c)
-			return 1;
-		c = val;
-	} while (c);
-
-	return 0;
-}
-
-static inline int atomic_add_unless(atomic_t *v, int a, int u)
-{
-	int ret;
-	unsigned long flags;
-	
-	ret = v->counter;
-	if (ret != u)
-		v->counter += a;
-
-	return ret != u;
-}
-
-#define smp_mb__before_atomic_dec()
-
-#include <asm-generic/atomic64.h>
-
 /****************************
  ** tools/perf/util/util.h **
  ****************************/
@@ -798,22 +474,9 @@ static inline int atomic_add_unless(atomic_t *v, int a, int u)
 void dump_stack(void);
 
 
-/******************
- ** linux/kref.h **
- ******************/
-
-struct kref { atomic_t refcount; };
-
-void kref_init(struct kref *);
-int  kref_put(struct kref *, void (*)(struct kref *));
-
-
 /********************
  ** linux/uidgid.h **
  ********************/
-
-typedef unsigned  kuid_t;
-typedef unsigned  kgid_t;
 
 struct user_namespace;
 #define GLOBAL_ROOT_UID (kuid_t)0
@@ -824,6 +487,7 @@ gid_t from_kgid_munged(struct user_namespace *, kgid_t);
 uid_t from_kuid(struct user_namespace *, kuid_t);
 gid_t from_kgid(struct user_namespace *, kgid_t);
 bool  uid_eq(kuid_t, kuid_t);
+kgid_t make_kgid(struct user_namespace *from, gid_t gid);
 
 
 /*****************
@@ -834,6 +498,7 @@ struct pid;
 
 pid_t pid_vnr(struct pid *);
 void put_pid(struct pid *);
+
 
 /***********************
  ** linux/kmemcheck.h **
@@ -897,7 +562,7 @@ enum { NUMA_NO_NODE = -1 };
  ** linux/jump_label.h **
  ************************/
 
-struct static_key { };
+struct static_key { unsigned dummy; };
 
 #define STATIC_KEY_INIT_FALSE ((struct static_key) {})
 
@@ -911,103 +576,7 @@ bool static_key_enabled(struct static_key *);
  ** linux/poison.h **
  ********************/
 
-/*
- * In list.h, LIST_POISON1 and LIST_POISON2 are assigned to 'struct list_head
- * *' as well as 'struct hlist_node *' pointers. Consequently, C++ compiler
- * produces an error "cannot convert... in assignment". To compile 'list.h'
- * included by C++ source code, we have to define these macros to the only
- * value universally accepted for pointer assigments.h
- */
-
-#ifdef __cplusplus
-#define LIST_POISON1 0
-#define LIST_POISON2 0
-#else
-#define LIST_POISON1 ((void *)0x00100100)
-#define LIST_POISON2 ((void *)0x00200200)
-#endif  /* __cplusplus */
-
-/**********************************
- ** linux/bitops.h, asm/bitops.h **
- **********************************/
-
-#define for_each_set_bit(bit, addr, size)                 \
-	for ((bit) = find_first_bit((addr), (size));          \
-		(bit) < (size);                                   \
-		(bit) = find_next_bit((addr), (size), (bit) + 1))
-
-#define BIT(nr) (1UL << (nr))
-
-enum { BITS_PER_LONG  = sizeof(long) * 8 };
-#define BIT_MASK(nr)  (1UL << ((nr) % BITS_PER_LONG))
-#define BIT_WORD(nr)  ((nr) / BITS_PER_LONG)
-
-#include <asm-generic/bitops/non-atomic.h>
-
-#define test_and_clear_bit(nr, addr) \
-	__test_and_clear_bit(nr, (volatile unsigned long *)(addr))
-#define test_and_set_bit(nr, addr) \
-	__test_and_set_bit(nr, (volatile unsigned long *)(addr))
-#define set_bit(nr, addr) \
-	__set_bit(nr, (volatile unsigned long *)(addr))
-#define clear_bit(nr, addr) \
-	__clear_bit(nr, (volatile unsigned long *)(addr))
-
-#define smp_mb__before_clear_bit()
-
-static inline unsigned long __fls(unsigned long word)
-{
-	return (sizeof(word) * 8) - 1 - __builtin_clzl(word);
-}
-
-int fls64(__u64 x);
-
-static int get_bitmask_order(unsigned int count) {
- return __builtin_clz(count) ^ 0x1f; }
-
-#define ffs(x) __builtin_ffs(x)
-#define ffz(x) ffs(~(x))
-
-static inline __u32 rol32(__u32 word, unsigned int shift)
-{
-	return (word << shift) | (word >> (32 - shift));
-}
-
-
-/*******************************
- ** asm-generic/bitops/find.h **
- *******************************/
-
-#define smp_mb__after_clear_bit() smp_mb()
-
-unsigned long find_first_zero_bit(unsigned long const *addr, unsigned long size);
-
-
-/****************************
- ** bitops/const_hweight.h **
- ****************************/
-
-#define hweight32(w) printk("hweight32 not implemented\n")
-#define hweight64(w) printk("hweight64 not implemented\n")
-
-
-/****************************
- ** asm-generic/getorder.h **
- ****************************/
-
-int get_order(unsigned long size);
-
-
-/******************
- ** linux/log2.h **
- ******************/
-
-unsigned long ilog2(unsigned long n);
-
-#define roundup_pow_of_two(n) ( \
-	1UL << (ilog2((n) - 1) + 1))
-
-int rounddown_pow_of_two(u32 n);
+#include <lx_emul/list.h>
 
 
 /****************
@@ -1098,6 +667,8 @@ s64 percpu_counter_read_positive(struct percpu_counter *fbc)
 
 void percpu_counter_destroy(struct percpu_counter *fbc);
 
+s64 percpu_counter_sum(struct percpu_counter *fbc);
+
 
 /**************************
  ** linux/page_counter.h **
@@ -1182,6 +753,9 @@ void si_meminfo(struct sysinfo *);
 
 bool page_is_pfmemalloc(struct page *page);
 
+#define page_private(page)         ((page)->private)
+#define set_page_private(page, v)  ((page)->private = (v))
+
 
 /********************
  ** linux/mmzone.h **
@@ -1203,25 +777,10 @@ unsigned long nr_free_buffer_pages(void);
  ** linux/gfp.h **
  *****************/
 
-enum {
-	__GFP_DMA            = 0x00000001u,
-	__GFP_WAIT           = 0x00000010u,
-	__GFP_COLD           = 0x00000100u,
-	__GFP_NOWARN         = 0x00000200u,
-	__GFP_REPEAT         = 0x00000400u,
-	__GFP_NORETRY        = 0x00001000u,
-	__GFP_MEMALLOC       = 0x00002000u,
-	__GFP_ZERO           = 0x00008000u,
-	__GFP_COMP           = 0x00004000u,
-	__GFP_NOMEMALLOC     = 0x00010000u,
-	__GFP_DIRECT_RECLAIM = 0x00400000u,
-};
+#include <lx_emul/gfp.h>
 
 enum {
-	GFP_DMA    = __GFP_DMA,
-	GFP_KERNEL = 0x0u,
-	GFP_USER   = 0x1u,
-	GFP_ATOMIC = 0x20u,
+	__GFP_DIRECT_RECLAIM = 0x00400000u,
 };
 
 struct page *alloc_pages_node(int nid, gfp_t gfp_mask,
@@ -1264,7 +823,8 @@ void *kzalloc_node(size_t size, gfp_t flags, int node);
 void *kmalloc_node_track_caller(size_t size, gfp_t flags, int node);
 void  kfree(const void *);
 void  kvfree(const void *);
-size_t ksize(const void *objp);
+void  kzfree(const void *);
+size_t ksize(void *objp); /* XXX is void const* */
 
 struct kmem_cache;
 
@@ -1275,6 +835,7 @@ void *kmem_cache_alloc_node(struct kmem_cache *, gfp_t flags, int node);
 
 void kmem_cache_free(struct kmem_cache *cache, void *objp);
 void kmem_cache_destroy(struct kmem_cache *);
+void *kmem_cache_zalloc(struct kmem_cache *k, gfp_t flags);
 
 
 /*********************
@@ -1323,40 +884,14 @@ void debug_check_no_locks_freed(const void *from, unsigned long len);
  ** linux/spinlock.h **
  **********************/
 
-typedef unsigned spinlock_t;
-#define DEFINE_SPINLOCK(name) spinlock_t name = 0;
-#define spin_lock_nested(lock, subclass)
-static inline void spin_lock_init(spinlock_t *lock) { }
-
-static inline void spin_lock(spinlock_t *lock) { }
-static inline void spin_unlock(spinlock_t *lock) { }
-
-static inline void spin_lock_bh(spinlock_t *lock) { }
-static inline void spin_unlock_bh(spinlock_t *lock) { }
-
-void spin_lock_irqsave(spinlock_t *, unsigned long);
-void spin_unlock_irqrestore(spinlock_t *, unsigned long);
-
-int spin_trylock(spinlock_t *lock);
-
-/****************************
- ** linux/spinlock_types.h **
- ****************************/
-
-#define __SPIN_LOCK_UNLOCKED(x) 0
+#include <lx_emul/spinlock.h>
 
 
 /*******************
  ** linux/mutex.h **
  *******************/
 
-struct mutex { };
-
-#define DEFINE_MUTEX(n) struct mutex n;
-
-void mutex_lock(struct mutex *);
-void mutex_unlock(struct mutex *);
-void mutex_init(struct mutex *);
+#include <lx_emul/mutex.h>
 
 
 /***********************************
@@ -1387,9 +922,7 @@ void read_unlock_bh(rwlock_t *);
  ** linux/rwsem.h **
  *******************/
 
-struct rw_semaphore { int dummy; };
-
-#define __RWSEM_INITIALIZER(name) { 0 }
+#include <lx_emul/semaphore.h>
 
 
 /*********************
@@ -1401,6 +934,7 @@ typedef unsigned seqlock_t;
 void seqlock_init (seqlock_t *);
 
 #define __SEQLOCK_UNLOCKED(x) 0
+
 
 /******************
  ** linux/time.h **
@@ -1468,6 +1002,15 @@ static inline ktime_t ktime_get_real(void)
 	return (ktime_t) { .tv64 = (s64)(jiffies * (1000 / HZ) * NSEC_PER_MSEC) };
 }
 
+ktime_t ns_to_ktime(u64 ns);
+
+
+/*************************
+ ** linux/timekeeping.h **
+ *************************/
+
+u64 ktime_get_ns(void);
+
 
 /*******************
  ** linux/timer.h **
@@ -1491,6 +1034,8 @@ struct timer_list
 void init_timer(struct timer_list *timer);
 void add_timer(struct timer_list *timer);
 int  mod_timer(struct timer_list *timer, unsigned long expires);
+int mod_timer_pending(struct timer_list *timer, unsigned long expires);
+int mod_timer_pinned(struct timer_list *timer, unsigned long expires);
 void setup_timer(struct timer_list *timer,void (*function)(unsigned long),
                  unsigned long data);
 int  timer_pending(const struct timer_list * timer);
@@ -1500,7 +1045,6 @@ long round_jiffies_relative(unsigned long);
 
 unsigned long round_jiffies(unsigned long);
 unsigned long round_jiffies_up(unsigned long);
-
 
 #define del_timer_sync del_timer
 
@@ -1512,7 +1056,9 @@ unsigned long round_jiffies_up(unsigned long);
 enum hrtimer_restart
 {
 	HRTIMER_NORESTART,
+};
 
+enum hrtimer_mode {
 	HRTIMER_MODE_REL_PINNED = 0x03,
 };
 
@@ -1520,6 +1066,12 @@ struct hrtimer
 {
 	enum hrtimer_restart (*function)(struct hrtimer *);
 };
+
+typedef int clockid_t;
+
+void hrtimer_init(struct hrtimer *timer, clockid_t which_clock, enum hrtimer_mode mode);
+void hrtimer_start(struct hrtimer *timer, ktime_t tim, const enum hrtimer_mode mode);
+int  hrtimer_cancel(struct hrtimer *timer);
 
 
 /*******************
@@ -1548,6 +1100,7 @@ struct ratelimit_state
 
 extern int ___ratelimit(struct ratelimit_state *, const char *);
 #define __ratelimit(state) ___ratelimit(state, __func__)
+
 
 /*******************
  ** linux/sched.h **
@@ -1670,11 +1223,10 @@ typedef void (*smp_call_func_t)(void *info);
 
 int on_each_cpu(smp_call_func_t, void *, int);
 
+
 /**********************
  ** linux/rcupdate.h **
  **********************/
-
-// struct rcu_head { };
 
 #define kfree_rcu(ptr, offset) kfree(ptr)
 
@@ -1705,6 +1257,7 @@ static inline void call_rcu(struct rcu_head *head,
 { func(head); }
 
 #define RCU_INIT_POINTER(p, v) p = (typeof(*v) *)v
+
 
 /*********************
  ** linux/rculist.h **
@@ -1743,6 +1296,8 @@ void hlist_add_after_rcu(struct hlist_node *, struct hlist_node *);
 void hlist_add_before_rcu(struct hlist_node *,struct hlist_node *);
 
 void list_replace_rcu(struct list_head *, struct list_head *);
+void hlist_replace_rcu(struct hlist_node *old, struct hlist_node *new);
+void hlist_add_behind_rcu(struct hlist_node *n, struct hlist_node *prev);
 
 
 /***************************
@@ -1792,18 +1347,20 @@ void synchronize_rcu_expedited(void);
 
 #define EXPORT_PER_CPU_SYMBOL(x)
 
+
 /********************
  ** linux/percpu.h **
  ********************/
 
 void *__alloc_percpu(size_t size, size_t align);
 
-#define __alloc_percpu_gfp(type, align, gfp) alloc_percpu(type)
+#define __alloc_percpu_gfp(size, align, gfp) __alloc_percpu(size, align)
 
-#define alloc_percpu_gfp(type, gfp) __alloc_percpu_gfp(type, 0, gfp)
+#define alloc_percpu_gfp(type, gfp) \
+	(typeof(type) __percpu *)__alloc_percpu_gfp(sizeof(type), __alignof__(type), gfp)
 
-#define alloc_percpu(type)      \
-        (typeof(type) __percpu *)__alloc_percpu(sizeof(type), __alignof__(type))
+#define alloc_percpu(type) \
+	(typeof(type) __percpu *)__alloc_percpu(sizeof(type), __alignof__(type))
 
 #define per_cpu(var, cpu) var
 #define per_cpu_ptr(ptr, cpu)   ({ (void)(cpu);(typeof(*(ptr)) *)(ptr); })
@@ -1812,6 +1369,7 @@ void *__alloc_percpu(size_t size, size_t align);
 #define __get_cpu_var(var) var
 #define __this_cpu_ptr(ptr) per_cpu_ptr(ptr, 0)
 #define this_cpu_ptr(ptr) per_cpu_ptr(ptr, 0)
+#define __this_cpu_write(pcp, val) pcp = val
 #define __this_cpu_read(pcp) pcp
 #define this_cpu_read(pcp) __this_cpu_read(pcp)
 
@@ -1827,6 +1385,7 @@ void *__alloc_percpu(size_t size, size_t align);
 
 #define raw_cpu_ptr(ptr) per_cpu_ptr(ptr, 0)
 #define raw_cpu_inc(pcp) pcp += 1
+
 
 /*********************
  ** linux/cpumask.h **
@@ -1912,6 +1471,8 @@ void tasklet_init(struct tasklet_struct *, void (*)(unsigned long),
                   unsigned long);
 void tasklet_schedule(struct tasklet_struct *);
 
+struct task_struct *this_cpu_ksoftirqd(void);
+
 
 /***********************
  ** /linux/irqflags.h **
@@ -1921,6 +1482,7 @@ void local_irq_save(unsigned long);
 void local_irq_restore(unsigned long);
 void local_irq_enable(void);
 void local_irq_disable(void);
+
 
 /*********************
  ** linux/hardirq.h **
@@ -1949,26 +1511,9 @@ void local_bh_enable(void);
  ** linux/string.h **
  ********************/
 
-int    memcmp(const void *, const void *, size_t);
-void  *memmove(void *, const void *, size_t);
-void  *memset(void *s, int c, size_t n);
-void  *kmemdup(const void *src, size_t len, gfp_t gfp);
-char *kstrdup(const char *s, gfp_t gfp);
-char  *strchr(const char *, int);
-size_t strnlen(const char *s, size_t maxlen);
-size_t strlen(const char *);
-char  *strnchr(const char *, size_t, int);
-char  *strcat(char *dest, const char *src);
-int    strcmp(const char *, const char *);
-int    strncmp(const char *, const char *, size_t);
-char  *strcpy(char *to, const char *from);
-char * strncpy(char *,const char *, __kernel_size_t);
-size_t strlcpy(char *dest, const char *src, size_t size);
-char * strsep(char **,const char *);
+#include <lx_emul/string.h>
 
-void  *genode_memcpy(void *d, const void *s, size_t n);
-static inline void  *memcpy(void *d, const void *s, size_t n) {
-	return genode_memcpy(d, s, n); }
+char *strnchr(const char *, size_t, int);
 
 
 /***************************
@@ -2030,6 +1575,8 @@ enum {
 
 bool capable(int cap);
 bool ns_capable(struct user_namespace *, int);
+struct file;
+bool file_ns_capable(const struct file *file, struct user_namespace *ns, int cap);
 
 
 /********************
@@ -2069,11 +1616,13 @@ enum
 	POLL_HUP = 6,
 };
 
+
 /********************
  ** linux/pm_qos.h **
  ********************/
 
 struct pm_qos_request { };
+
 
 /*********************************
  ** (uapi|linux|kernel)/audit.h **
@@ -2118,6 +1667,7 @@ void        put_device(struct device *);
 
 int dev_printk_emit(int, const struct device *, const char *, ...);
 
+
 /*************************
  ** linux/dma-direction **
  *************************/
@@ -2147,6 +1697,9 @@ void net_dmaengine_put(void);
  *****************/
 
 struct ethtool_ts_info;
+struct ethtool_modinfo;
+struct ethtool_eeprom;
+
 struct phy_device;
 
 struct phy_driver
@@ -2160,6 +1713,7 @@ struct phy_device
 {
 	struct phy_driver *drv;
 };
+
 
 /*****************************
  ** uapi/asm-generic/poll.h **
@@ -2179,45 +1733,23 @@ enum {
 };
 
 
+/***********************
+ ** linux/workqueue.h **
+ ***********************/
+
+#include <lx_emul/work.h>
+
+void INIT_DEFERRABLE_WORK(struct delayed_work *, void (*func)(struct work_struct *));
+
+#define system_power_efficient_wq 0
+#define work_pending(work) 0
+
+
 /******************
  ** linux/wait.h **
  ******************/
 
-typedef struct wait_queue_head { int dummy; } wait_queue_head_t;
-typedef struct wait_queue { } wait_queue_t;
-
-#define DEFINE_WAIT(name) \
-	wait_queue_t name;
-
-#define __WAIT_QUEUE_HEAD_INITIALIZER(name) { 0 }
-
-#define DECLARE_WAITQUEUE(name, tsk) \
-        wait_queue_t name
-
-#define DECLARE_WAIT_QUEUE_HEAD(name) \
-	wait_queue_head_t name = __WAIT_QUEUE_HEAD_INITIALIZER(name)
-
-#define DEFINE_WAIT_FUNC(name, function) \
-       wait_queue_t name
-
-#define wake_up(x)
-#define wake_up_interruptible_all(x)
-
-void init_waitqueue_head(wait_queue_head_t *);
-int waitqueue_active(wait_queue_head_t *);
-
-void wake_up_interruptible(wait_queue_head_t *);
-void wake_up_interruptible_sync_poll(wait_queue_head_t *, int);
-void wake_up_interruptible_poll(wait_queue_head_t *, int);
-
-void prepare_to_wait(wait_queue_head_t *, wait_queue_t *, int);
-void prepare_to_wait_exclusive(wait_queue_head_t *, wait_queue_t *, int);
-void finish_wait(wait_queue_head_t *, wait_queue_t *);
-
-int  autoremove_wake_function(wait_queue_t *, unsigned, int, void *);
-void add_wait_queue(wait_queue_head_t *, wait_queue_t *);
-void add_wait_queue_exclusive(wait_queue_head_t *, wait_queue_t *);
-void remove_wait_queue(wait_queue_head_t *, wait_queue_t *);
+long wait_woken(wait_queue_t *wait, unsigned mode, long timeout);
 
 
 /******************
@@ -2230,11 +1762,13 @@ struct file;
 void poll_wait(struct file * filp, wait_queue_head_t * wait_address, poll_table *p);
 bool poll_does_not_wait(const poll_table *);
 
+
 /****************************
  ** linux/user_namespace.h **
  ****************************/
 
 struct user_namespace { };
+
 
 /******************
  ** linux/cred.h **
@@ -2263,6 +1797,7 @@ extern struct user_namespace init_user_ns;
 
 struct group_info *get_current_groups();
 void put_cred(const struct cred *);
+void put_group_info(struct group_info*);
 
 static inline void current_uid_gid(kuid_t *u, kgid_t *g)
 {
@@ -2434,6 +1969,8 @@ ssize_t iov_iter_get_pages(struct iov_iter *i, struct page **pages,
 size_t csum_and_copy_to_iter(void *addr, size_t bytes, __wsum *csum, struct iov_iter *i);
 size_t csum_and_copy_from_iter(void *addr, size_t bytes, __wsum *csum, struct iov_iter *i);
 
+bool iter_is_iovec(struct iov_iter *i);
+
 
 /*******************************
  ** uapi/asm-generic/ioctls.h **
@@ -2473,6 +2010,7 @@ struct new_utsname *utsname(void);
 
 struct sock_fprog { };
 
+
 /********************
  ** linux/filter.h **
  ********************/
@@ -2487,9 +2025,15 @@ struct sk_filter
 
 unsigned int sk_filter_len(const struct sk_filter *);
 int sk_filter(struct sock *, struct sk_buff *);
+bool sk_filter_charge(struct sock *sk, struct sk_filter *fp);
+void sk_filter_uncharge(struct sock *sk, struct sk_filter *fp);
 int sk_attach_filter(struct sock_fprog *, struct sock *);
 int sk_detach_filter(struct sock *);
 int sk_get_filter(struct sock *, struct sock_filter *, unsigned);
+int sk_attach_bpf(u32 ufd, struct sock *sk);
+
+int bpf_tell_extensions(void);
+
 
 /*****************************
  ** uapi/linux/hdlc/ioctl.h **
@@ -2504,52 +2048,8 @@ typedef struct { } te1_settings;
 typedef struct { } sync_serial_settings;
 
 
-/***********************
- ** linux/workquque.h **
- ***********************/
-
-struct workqueue_struct { };
-
-struct work_struct;
-typedef void (*work_func_t)(struct work_struct *work);
-
-struct work_struct {
-	work_func_t func;
-	struct list_head entry;
-};
-
-struct delayed_work
-{
-	struct work_struct work;
-};
-
-#define DECLARE_DELAYED_WORK(n, f)                                      \
-        struct delayed_work n
-
-#define __WORK_INITIALIZER(n, f) { \
-	.entry  = { &(n).entry, &(n).entry }, \
-	.func = (f) \
-}
-
-#define INIT_WORK(_work, _func) \
-	printk("%s:%d: INIT_WORK not implemented from: %p\n", __func__, __LINE__, __builtin_return_address(0));
-
-extern struct workqueue_struct *system_wq;
-#define system_power_efficient_wq 0
-
-bool schedule_work(struct work_struct *work);
-bool schedule_delayed_work(struct delayed_work *, unsigned long);
-bool cancel_delayed_work(struct delayed_work *);
-bool cancel_delayed_work_sync(struct delayed_work *);
-bool mod_delayed_work(struct workqueue_struct *, struct delayed_work *,
-                      unsigned long);
-
-
-void INIT_DEFERRABLE_WORK(struct delayed_work *, void (*func)(struct work_struct *));
-
-
 /**********************
- ** linux/inerrupt.h **
+ ** linux/interrupt.h **
  **********************/
 
 struct tasklet_struct
@@ -2561,6 +2061,7 @@ struct tasklet_struct
  ********************/
 
 struct hash_desc { };
+
 
 /************************
  ** linux/cryptohash.h **
@@ -2611,12 +2112,19 @@ void __rtnl_unlock(void);
 int  rtnl_is_locked(void);
 int  rtnl_put_cacheinfo(struct sk_buff *, struct dst_entry *, u32, long, u32);
 
+bool lockdep_rtnl_is_held(void);
+
+struct sk_buff *rtmsg_ifinfo_build_skb(int type, struct net_device *dev, unsigned change, gfp_t flags);
+void rtmsg_ifinfo_send(struct sk_buff *skb, struct net_device *dev, gfp_t flags);
+
 
 /***********************
  ** linux/genetlink.h **
  ***********************/
 
 extern atomic_t genl_sk_destructing_cnt;
+extern wait_queue_head_t genl_sk_destructing_waitq;
+
 
 /*********************
  ** net/flow_keys.h **
@@ -2643,8 +2151,6 @@ struct flow_dissector_key_ipv4_addrs {
 struct flow_dissector_key_addrs {
 	union {
 		struct flow_dissector_key_ipv4_addrs v4addrs;
-		// struct flow_dissector_key_ipv6_addrs v6addrs;
-		// struct flow_dissector_key_tipc_addrs tipcaddrs;
 	};
 };
 
@@ -2727,7 +2233,7 @@ enum
  ** linux/u64_stats_sync.h **
  ****************************/
 
-struct u64_stats_sync { };
+struct u64_stats_sync { unsigned dummy; };
 
 void u64_stats_init(struct u64_stats_sync *syncp);
 void u64_stats_update_begin(struct u64_stats_sync *syncp);
@@ -2751,7 +2257,6 @@ struct netns_core
  ** net/net_namespace.h **
  *************************/
 
-#include <linux/list.h>
 #include <uapi/linux/snmp.h>
 #include <net/netns/mib.h>
 #include <net/netns/ipv4.h>
@@ -2823,9 +2328,14 @@ int  register_pernet_device(struct pernet_operations *);
 void release_net(struct net *net);
 
 int  rt_genid(struct net *);
+int  rt_genid_ipv4(struct net *net);
 void rt_genid_bump(struct net *);
+void rt_genid_bump_ipv4(struct net *net);
+
+int fnhe_genid(struct net *net);
 
 int peernet2id(struct net *net, struct net *peer);
+bool peernet_has_id(struct net *net, struct net *peer);
 
 
 /**************************
@@ -2862,6 +2372,9 @@ void write_seqlock(seqlock_t *);
 void write_sequnlock(seqlock_t *);
 void write_seqcount_begin(seqcount_t *);
 void write_seqcount_end(seqcount_t *);
+
+unsigned raw_seqcount_begin(const seqcount_t *s);
+int read_seqcount_retry(const seqcount_t *s, unsigned start);
 
 
 /**********************
@@ -2999,6 +2512,7 @@ __wsum csum_and_copy_to_user(const void *src, void __user *dst, int len,
 }
 
 __wsum remcsum_adjust(void *ptr, __wsum csum, int start, int offset);
+void csum_replace4(__sum16 *sum, __be32 from, __be32 to);
 
 
 /*********************
@@ -3034,6 +2548,29 @@ int             is_vlan_dev(struct net_device *);
 u16             vlan_tx_tag_present(struct sk_buff *);
 bool            vlan_do_receive(struct sk_buff **);
 bool            vlan_tx_nonzero_tag_present(struct sk_buff *);
+
+enum {
+	VLAN_VID_MASK    = 0x0fff,
+	VLAN_CFI_MASK    = 0x1000, /* Canonical Format Indicator */
+	VLAN_TAG_PRESENT = VLAN_CFI_MASK,
+};
+
+#define skb_vlan_tag_get(__skb)      ((__skb)->vlan_tci & ~VLAN_TAG_PRESENT)
+#define skb_vlan_tag_present(__skb)  ((__skb)->vlan_tci & VLAN_TAG_PRESENT)
+#define skb_vlan_tag_get_id(__skb)   ((__skb)->vlan_tci & VLAN_VID_MASK)
+
+__be16 __vlan_get_protocol(struct sk_buff *skb, __be16 type, int *depth);
+void __vlan_hwaccel_put_tag(struct sk_buff *skb, __be16 vlan_proto, u16 vlan_tci);
+int __vlan_insert_tag(struct sk_buff *skb, __be16 vlan_proto, u16 vlan_tci);
+
+
+typedef u64 netdev_features_t; /* XXX actually defined in netdev_features.h */
+
+bool skb_vlan_tagged(const struct sk_buff *skb);
+netdev_features_t vlan_features_check(const struct sk_buff *skb, netdev_features_t features);
+bool vlan_hw_offload_capable(netdev_features_t features, __be16 proto);
+struct sk_buff *__vlan_hwaccel_push_inside(struct sk_buff *skb);
+void vlan_set_encap_proto(struct sk_buff *skb, struct vlan_hdr *vhdr);
 
 
 /*****************************
@@ -3157,6 +2694,7 @@ void rtmsg_ifinfo(int type, struct net_device *dev, unsigned change, gfp_t flags
 
 struct gnet_dump { };
 
+
 /***************
  ** net/tcp.h **
  ***************/
@@ -3206,6 +2744,18 @@ struct ip_tunnel_info
 	u8 options_len;
 	u8 mode;
 };
+
+void ip_tunnel_key_init(struct ip_tunnel_key *key,
+		__be32 saddr, __be32 daddr,
+		u8 tos, u8 ttl,
+		__be16 tp_src, __be16 tp_dst,
+		__be64 tun_id, __be16 tun_flags);
+
+struct lwtunnel_state;
+struct ip_tunnel_info *lwt_tun_info(struct lwtunnel_state *lwtstate);
+struct metadata_dst *iptunnel_metadata_reply(struct metadata_dst *md, gfp_t flags);
+
+void ip_tunnel_core_init(void);
 
 
 /********************************
@@ -3334,6 +2884,25 @@ static inline int lwtunnel_input(struct sk_buff *skb)
 {
 	return -EOPNOTSUPP;
 }
+
+static inline int lwtunnel_build_state(struct net_device *dev, u16 encap_type,
+                                       struct nlattr *encap,
+                                       unsigned int family, const void *cfg,
+                                       struct lwtunnel_state **lws)
+{
+	return -EOPNOTSUPP;
+}
+
+void lwtstate_free(struct lwtunnel_state *lws);
+void lwtstate_put(struct lwtunnel_state *lws);
+int lwtunnel_fill_encap(struct sk_buff *skb, struct lwtunnel_state *lwtstate);
+
+static inline bool lwtunnel_output_redirect(struct lwtunnel_state *lwtstate) { return false; }
+static inline bool lwtunnel_input_redirect(struct lwtunnel_state *lwtstate) { return false; }
+
+struct lwtunnel_state * lwtstate_get(struct lwtunnel_state *lws);
+int lwtunnel_cmp_encap(struct lwtunnel_state *a, struct lwtunnel_state *b);
+int lwtunnel_get_encap_size(struct lwtunnel_state *lwtstate);
 
 
 /****************
@@ -3466,6 +3035,7 @@ int  inet_ctl_sock_create(struct sock **, unsigned short,
                           unsigned short, unsigned char,
                           struct net *);
 void inet_ctl_sock_destroy(struct sock *);
+int inet_recv_error(struct sock *sk, struct msghdr *msg, int len, int *addr_len);
 
 
 /***********************
@@ -3537,6 +3107,9 @@ bool  netpoll_rx_on(struct sk_buff *);
 int   netpoll_receive_skb(struct sk_buff *);
 void  netpoll_poll_unlock(void *);
 
+void netpoll_poll_disable(struct net_device *dev);
+void netpoll_poll_enable(struct net_device *dev);
+
 
 /************************
  ** net/ethernet/eth.c **
@@ -3557,6 +3130,13 @@ int nf_hook(u_int8_t pf, unsigned int hook, struct net *net,
             struct net_device *indev, struct net_device *outdev,
             int (*okfn)(struct net *, struct sock *, struct sk_buff *));
 void nf_ct_attach(struct sk_buff *, struct sk_buff *);
+
+
+/*******************************
+ ** linux/netfilter_ingress.h **
+ *******************************/
+
+void nf_hook_ingress_init(struct net_device *dev);
 
 
 /******************************
@@ -3651,6 +3231,8 @@ u32  random32(void);
 void add_device_randomness(const void *, unsigned int);
 u32  next_pseudo_random32(u32);
 void srandom32(u32 seed);
+u32 prandom_u32_max(u32 ep_ro);
+void prandom_seed(u32 seed);
 
 
 /**********************
@@ -3711,6 +3293,7 @@ int ipv6_only_sock(const struct sock *);
 
 #define ipv6_optlen(p)  (((p)->hdrlen+1) << 3)
 #define ipv6_authlen(p) (((p)->hdrlen+2) << 2)
+#define ipv6_sk_rxinfo(sk) 0
 
 /* XXX not the sanest thing to do... */
 struct ipv6_pinfo {
@@ -3740,6 +3323,7 @@ __be32 in_aton(const char *);
  **********************/
 
 int cipso_v4_validate(const struct sk_buff *, unsigned char **option);
+
 
 /***********************
  ** uapi/linux/stat.h **
@@ -3773,6 +3357,60 @@ struct attribute {
 	mode_t      mode;
 };
 
+int sysfs_create_link(struct kobject *kobj, struct kobject *target, const char *name);
+void sysfs_remove_link(struct kobject *kobj, const char *name);
+void sysfs_remove_link_from_group(struct kobject *kobj, const char *group_name, const char *link_name);
+
+
+/*********************
+ ** net/pusy_poll.h **
+ *********************/
+
+bool sk_busy_loop(struct sock *sk, int nonblock);
+bool sk_can_busy_loop(struct sock *sk);
+void sk_mark_napi_id(struct sock *sk, struct sk_buff *skb);
+
+
+/******************
+ ** net/l3mdev.h **
+ ******************/
+
+int l3mdev_get_saddr(struct net *net, int ifindex, struct flowi4 *fl4);
+struct rtable *l3mdev_get_rtable(const struct net_device *dev, const struct flowi4 *fl4);
+bool netif_index_is_l3_master(struct net *net, int ifindex);
+u32 l3mdev_fib_table(const struct net_device *dev);
+int l3mdev_master_ifindex_rcu(struct net_device *dev);
+int l3mdev_fib_oif_rcu(struct net_device *dev);
+u32 l3mdev_fib_table_by_index(struct net *net, int ifindex);
+int l3mdev_master_ifindex(struct net_device *dev);
+
+
+/***********************
+ ** linux/sock_diag.h **
+ ***********************/
+
+bool sock_diag_has_destroy_listeners(const struct sock *sk);
+void sock_diag_broadcast_destroy(struct sock *sk);
+
+
+/************************
+ ** net/ip6_checksum.h **
+ ************************/
+
+__sum16 csum_ipv6_magic(const struct in6_addr *saddr, const struct in6_addr *daddr,
+                        __u32 len, unsigned short proto, __wsum csum);
+
+
+/***********************
+ ** linux/switchdev.h **
+ ***********************/
+
+struct fib_info;
+
+int switchdev_fib_ipv4_add(u32 dst, int dst_len, struct fib_info *fi, u8 tos, u8 type, u32 nlflags, u32 tb_id);
+int switchdev_fib_ipv4_del(u32 dst, int dst_len, struct fib_info *fi, u8 tos, u8 type, u32 tb_id);
+void switchdev_fib_ipv4_abort(struct fib_info *fi);
+
 
 /*******************
  ** Tracing stuff **
@@ -3792,17 +3430,27 @@ void trace_netif_receive_skb(struct sk_buff *);
 void trace_napi_poll(struct napi_struct *);
 void trace_skb_copy_datagram_iovec(const struct sk_buff *, int);
 void trace_udp_fail_queue_rcv_skb(int, struct sock*);
+void trace_net_dev_start_xmit(struct sk_buff*, struct net_device*);
+void trace_netif_rx_entry(struct sk_buff*);
+void trace_netif_rx_ni_entry(struct sk_buff*);
+void trace_netif_receive_skb_entry(struct sk_buff*);
+void trace_napi_gro_receive_entry(struct sk_buff*);
+void trace_napi_gro_frags_entry(struct sk_buff*);
+void trace_fib_validate_source(struct net_device *, struct flowi4*);
+void trace_fib_table_lookup(void*, void*);
+void trace_fib_table_lookup_nh(void*);
 
 
-/**
- * Misc
- */
+/******************
+ ** Lxip private **
+ ******************/
 
 void set_sock_wait(struct socket *sock, unsigned long ptr);
-int socket_check_state(struct socket *sock);
+int  socket_check_state(struct socket *sock);
 void log_sock(struct socket *sock);
 
 void lx_trace_event(char const *, ...) __attribute__((format(printf, 1, 2)));
 
-#endif /* _LX_EMUL_H_ */
+#include <lx_emul/extern_c_end.h>
 
+#endif /* _LX_EMUL_H_ */

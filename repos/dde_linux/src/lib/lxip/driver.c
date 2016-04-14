@@ -6,25 +6,30 @@
  */
 
 /*
- * Copyright (C) 2013 Genode Labs GmbH
+ * Copyright (C) 2013-2016 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
  */
 
+/* Linux includes */
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 
+/* local includes */
 #include <lx_emul.h>
 #include <nic.h>
 
+
 static struct net_device *_dev;
+
 
 static int driver_net_open(struct net_device *dev)
 {
 	_dev = dev;
 	return 0;
 }
+
 
 int driver_net_xmit(struct sk_buff *skb, struct net_device *dev)
 {
@@ -48,37 +53,6 @@ int driver_net_xmit(struct sk_buff *skb, struct net_device *dev)
 	stats->tx_bytes += len;
 
  	return NETDEV_TX_OK;
-}
-
-
-void net_driver_rx(void *addr, unsigned long size)
-{
-	struct net_device_stats *stats;
-
-	if (!_dev)
-		return;
-
-	stats = (struct net_device_stats*) netdev_priv(_dev);
-
-	/* allocate skb */
-	struct sk_buff *skb = dev_alloc_skb(size + 4);
-	if (!skb) {
-		printk(KERN_NOTICE "genode_net_rx: low on mem - packet dropped!\n");
-		stats->rx_dropped++;
-		return;
-	}
-
-	/* copy packet */
-	memcpy(skb_put(skb, size), addr, size);
-
-	skb->dev       = _dev;
-	skb->protocol  = eth_type_trans(skb, _dev);
-	skb->ip_summed = CHECKSUM_NONE;
-
-	netif_receive_skb(skb);
-
-	stats->rx_packets++;
-	stats->rx_bytes += size;
 }
 
 
@@ -117,4 +91,39 @@ out:
 	return err;
 }
 
+
 module_init(driver_init);
+
+
+/**
+ * Called by Nic_client when a packet was received
+ */
+void net_driver_rx(void *addr, unsigned long size)
+{
+	struct net_device_stats *stats;
+
+	if (!_dev)
+		return;
+
+	stats = (struct net_device_stats*) netdev_priv(_dev);
+
+	/* allocate skb */
+	struct sk_buff *skb = dev_alloc_skb(size + 4);
+	if (!skb) {
+		printk(KERN_NOTICE "genode_net_rx: low on mem - packet dropped!\n");
+		stats->rx_dropped++;
+		return;
+	}
+
+	/* copy packet */
+	memcpy(skb_put(skb, size), addr, size);
+
+	skb->dev       = _dev;
+	skb->protocol  = eth_type_trans(skb, _dev);
+	skb->ip_summed = CHECKSUM_NONE;
+
+	netif_receive_skb(skb);
+
+	stats->rx_packets++;
+	stats->rx_bytes += size;
+}

@@ -5,29 +5,31 @@
  */
 
 /*
- * Copyright (C) 2013 Genode Labs GmbH
+ * Copyright (C) 2013-2016 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
  */
+
+/* Genode includes */
 #include <base/env.h>
 #include <base/signal.h>
 #include <base/printf.h>
 #include <base/thread.h>
 
+/* local includes */
 #include <lxip/lxip.h>
-#include <env.h>
-#include <init.h>
+#include <lx.h>
 #include <nic.h>
 
-extern "C" void wait_for_continue();
 
 static const bool verbose = false;
 
 
 namespace Linux {
-		#include <lx/extern_c_begin.h>
 		#include <lx_emul.h>
+
+		#include <lx_emul/extern_c_begin.h>
 		#include <linux/socket.h>
 		#include <uapi/linux/in.h>
 		extern int sock_setsockopt(struct socket *sock, int level,
@@ -37,7 +39,7 @@ namespace Linux {
 		                           int op, char __user *optval,
 		                           int __user *optlen);
 		struct socket *sock_alloc(void);
-		#include <lx/extern_c_end.h>
+		#include <lx_emul/extern_c_end.h>
 }
 
 namespace Net
@@ -106,7 +108,6 @@ namespace Net
 			int           err;
 			Lxip::ssize_t len;
 		};
-
 };
 
 
@@ -121,8 +122,9 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 		Result       _result;
 		Lxip::Handle _handle;
 
-		Genode::Signal_transmitter _signal;
-		Genode::Semaphore          _block;
+		Genode::Signal_receiver    &_sig_rec;
+		Genode::Signal_transmitter  _signal;
+		Genode::Semaphore           _block;
 
 		void _submit_and_block()
 		{
@@ -388,19 +390,21 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 
 	public:
 
-		Socketcall()
-		  : Thread("socketcall"),
-		    _signal(Genode::Signal_context_capability(Env::receiver()->manage(this)))
+		Socketcall(Genode::Signal_receiver &sig_rec)
+		:
+			Thread("socketcall"),
+			_sig_rec(sig_rec),
+			_signal(Genode::Signal_context_capability(sig_rec.manage(this)))
 		{
 			start();
 		}
 
-		~Socketcall() { Env::receiver()->dissolve(this); }
+		~Socketcall() { _sig_rec.dissolve(this); }
 
 		void entry()
 		{
 			while (true) {
-				Genode::Signal s = Net::Env::receiver()->wait_for_signal();
+				Genode::Signal s = _sig_rec.wait_for_signal();
 				static_cast<Genode::Signal_dispatcher_base *>(s.context())->dispatch(s.num());
 			}
 		}
@@ -633,8 +637,14 @@ class Net::Socketcall : public Genode::Signal_dispatcher_base,
 
 Lxip::Socketcall & Lxip::init(char *address_config)
 {
-	static int             init = lxip_init(address_config);
-	static Net::Socketcall socketcall;
+	static Genode::Signal_receiver sig_rec;
+
+	Lx::timer_init(sig_rec);
+	Lx::event_init(sig_rec);
+	Lx::nic_client_init(sig_rec);
+
+	static int init = lxip_init(address_config);
+	static Net::Socketcall socketcall(sig_rec);
 
 	return socketcall;
 }

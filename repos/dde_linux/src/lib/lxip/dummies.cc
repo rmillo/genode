@@ -5,7 +5,7 @@
  */
 
 /*
- * Copyright (C) 2013 Genode Labs GmbH
+ * Copyright (C) 2013-2016 Genode Labs GmbH
  *
  * This file is part of the Genode OS framework, which is distributed
  * under the terms of the GNU General Public License version 2.
@@ -14,6 +14,7 @@
 /* Genode includes */
 #include <base/printf.h>
 #include <base/sleep.h>
+
 
 extern "C" {
 	typedef long DUMMY;
@@ -60,7 +61,7 @@ enum {
 			Genode::sleep_forever(); \
 		} while (0); \
 		return retval; \
-	}
+}
 
 
 /*
@@ -134,7 +135,7 @@ DUMMY_SKIP(-1, smp_mb)
 DUMMY_SKIP(-1, smp_rmb)
 DUMMY_SKIP(-1, smp_wmb)
 DUMMY_SKIP(-1, spin_lock_irqsave)
-DUMMY_SKIP( 1, spin_trylock)
+DUMMY_RET(  1, spin_trylock)
 DUMMY_SKIP(-1, spin_unlock_irqrestore)
 DUMMY_SKIP(-1, synchronize_rcu)
 DUMMY_SKIP(-1, trace_kfree_skb)
@@ -259,8 +260,7 @@ DUMMY(-1, hlist_add_before_rcu)
 DUMMY(-1, hlist_nulls_del)
 DUMMY(-1, hlist_nulls_empty)
 DUMMY(-1, hotcpu_notifier)
-DUMMY(-1, hweight32)
-DUMMY(-1, hweight64)
+DUMMY_STOP(0, hweight64)
 DUMMY(-1, inet_ctl_sock_destroy)
 DUMMY(-1, inet_diag_dump_icsk)
 DUMMY(-1, inet_diag_dump_one_icsk)
@@ -317,8 +317,6 @@ DUMMY(-1, kmem_cache_destroy)
 DUMMY(-1, kobject_put)
 DUMMY(-1, kobject_uevent)
 DUMMY(-1, krealloc)
-DUMMY(-1, kref_init)
-DUMMY(-1, kref_put)
 DUMMY(-1, kstrdup)
 DUMMY(-1, kstrtoul)
 DUMMY(-1, ktime_equal)
@@ -392,7 +390,6 @@ DUMMY(-1, put_cpu_var)
 DUMMY(-1, put_cred)
 DUMMY(-1, put_device)
 DUMMY(-1, put_pid)
-DUMMY(-1, put_unaligned_be32)
 DUMMY(-1, __raise_softirq_irqoff)
 DUMMY(-1, raise_softirq_irqoff)
 DUMMY(-1, random32)
@@ -438,13 +435,12 @@ DUMMY(-1, security_socket_getpeersec_stream)
 DUMMY(-1, security_sock_graft)
 DUMMY(-1, send_sigurg)
 DUMMY(-1, send_sig)
-DUMMY(-1, __set_bit)
-DUMMY(-1, set_bit)
+DUMMY_STOP(-1, set_bit)
 DUMMY(-1, __set_current_state)
 DUMMY(-1, set_current_state)
-DUMMY(-1, sg_mark_end)
-DUMMY(-1, sg_set_buf)
-DUMMY(-1, sg_set_page)
+DUMMY_STOP(-1, sg_mark_end)
+DUMMY_STOP(-1, sg_set_buf)
+DUMMY_STOP(-1, sg_set_page)
 DUMMY(-1, sha_transform)
 DUMMY(-1, si_meminfo)
 DUMMY(-1, S_ISSOCK)
@@ -574,7 +570,6 @@ DUMMY(0, is_vmalloc_addr)
 DUMMY(0, kmem_cache_zalloc)
 DUMMY(0, kstrtou8)
 DUMMY(0, kvfree)
-DUMMY(0, kzfree)
 
 /* only relevant when CONFIG_NET_L3_MASTER_DEV set */
 DUMMY_RET(0, l3mdev_fib_oif_rcu)
@@ -592,7 +587,6 @@ DUMMY(0, lwt_tun_info)
 DUMMY(0, lwtstate_free)
 DUMMY(0, lwtstate_get)
 DUMMY_RET(0, lwtstate_put) /* no return value */
-DUMMY(0, lwtunnel_build_state)
 DUMMY_RET(0, lwtunnel_cmp_encap)
 DUMMY(0, lwtunnel_fill_encap)
 DUMMY(0, lwtunnel_get_encap_size)
@@ -676,5 +670,14 @@ DUMMY(0, wait_woken)
 DUMMY_STOP(0, work_pending)
 DUMMY(0, __module_get)
 DUMMY_RET(0, peernet2id)
+DUMMY(0, ktime_get_ns)
+DUMMY(0, ipv6_get_dsfield)
+
+DUMMY_SKIP(0, spin_lock_init)
+DUMMY_SKIP(0, spin_lock_nested)
+DUMMY_SKIP(0, spin_lock)
+DUMMY_SKIP(0, spin_unlock)
+DUMMY_SKIP(0, spin_lock_bh)
+DUMMY_SKIP(0, spin_unlock_bh)
 
 } /* extern "C" */
