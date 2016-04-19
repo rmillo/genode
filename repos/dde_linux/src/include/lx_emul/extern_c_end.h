@@ -13,6 +13,7 @@
 
 #ifdef __cplusplus
 
+#undef delete
 #undef new
 #undef class
 #undef private
