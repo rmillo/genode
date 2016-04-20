@@ -19,6 +19,8 @@
 #include <timer_session/connection.h>
 #include <util/string.h>
 
+#include <util/backtrace.h>
+
 /* Local includes */
 #include "signal.h"
 #include "platform/lx_mem.h"
@@ -37,6 +39,11 @@ namespace Genode {
 }
 
 unsigned long jiffies;
+
+void backtrace(void)
+{
+	Genode::print_backtrace();
+}
 
 /**
  * Back-end allocator for Genode's slab allocator
@@ -1379,18 +1386,7 @@ long __wait_completion(struct completion *work, unsigned long timeout)
 	}
 	work->done = 0;
 
-#if 0
-	work->task = (void *)Lx::scheduler().current();
-	wait_queue_head_t wait;
-	init_waitqueue_head(&wait);
-	prepare_to_wait(&wait, 0, 0);
-	_wait_event(wait, work->done);
-	PWRN("finished");
-	finish_wait(&wait, 0);
-	remove_wait_queue(&wait, 0);
-	work->done = 0;
-#endif
-	return 0;
+	return 1;
 }
 
 
@@ -1424,9 +1420,12 @@ void tasklet_hi_schedule(struct tasklet_struct *tasklet)
 }
 
 
-struct workqueue_struct *create_singlethread_workqueue(char const *)
+struct workqueue_struct *create_singlethread_workqueue(char const *name)
 {
 	workqueue_struct *wq = (workqueue_struct *)kzalloc(sizeof(workqueue_struct), 0);
+	Lx::Work *work = Lx::Work::alloc_work_queue(Genode::env()->heap(), name);
+	wq->task       = (void *)work;
+
 	return wq;
 }
 
@@ -1434,16 +1433,7 @@ struct workqueue_struct *create_singlethread_workqueue(char const *)
 struct workqueue_struct *alloc_workqueue(const char *fmt, unsigned int flags,
                                          int max_active, ...)
 {
-	return create_singlethread_workqueue(nullptr);
-}
-
-
-bool queue_work(struct workqueue_struct *wq, struct work_struct *work)
-{
-	Lx::Work::work_queue().schedule(work);
-	Lx::Work::work_queue().unblock();
-
-	return true;
+	return create_singlethread_workqueue(fmt);
 }
 
 
@@ -1463,7 +1453,6 @@ int request_irq(unsigned int irq, irq_handler_t handler, unsigned long flags,
 {
 	for (Lx::Pci_dev *pci_dev =  Lx::pci_dev_registry()->first(); pci_dev; pci_dev = pci_dev->next())
 		if (pci_dev->irq == irq) {
-			PDBG("Rueest IRQ");
 			Lx::Irq::irq().request_irq(pci_dev->client(), handler, dev);
 			return 0;
 		}

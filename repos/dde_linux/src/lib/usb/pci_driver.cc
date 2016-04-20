@@ -98,7 +98,8 @@ extern "C" int pci_register_driver(struct pci_driver *driver)
 		pci_device_id const *matching_id = nullptr;
 		for (pci_device_id const *id = id_table; id->device; id++) {
 
-			PDBG("idclass: %x idclassm: %x devclass %x", id->class_, id->class_mask, class_code);
+			lx_log(DEBUG_PCI,"idclass: %x idclassm: %x devclass %x", id->class_,
+			       id->class_mask, class_code);
 
 			/* check for drivers that support any device for a given class */
 			if (id->device != (unsigned)PCI_ANY_ID || !id->class_mask)
@@ -122,18 +123,17 @@ extern "C" int pci_register_driver(struct pci_driver *driver)
 
 		/* register driver at the 'pci_dev' struct */
 		pci_dev->dev.driver = &driver->driver;
-		PDBG("probe");
+
 		/* call probe function of the Linux driver */
 		if (driver->probe(pci_dev, matching_id)) {
 
 			/* if the probing failed, revert the creation of 'pci_dev' */
 			pci_dev_put(pci_dev);
-			PDBG("probe failed");
 			return false;
 		}
 
 		found = true;
-		PDBG("found");
+
 		/* multiple device support continue */
 		return true;
 	};

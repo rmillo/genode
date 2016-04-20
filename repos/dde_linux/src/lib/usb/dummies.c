@@ -192,13 +192,10 @@ void set_timer_slack(struct timer_list *time, int slack_hz) { TRACE; }
 
 void usleep_range(unsigned long min, unsigned long max) { TRACE; }
 
+
 /***********************
  ** linux/workquque.h **
  ***********************/
-
-//XXX: do right
-struct workqueue_struct dummy;
-struct workqueue_struct *system_power_efficient_wq = &dummy;
 
 void destroy_workqueue(struct workqueue_struct *wq) { TRACE; }
 

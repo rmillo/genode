@@ -23,18 +23,18 @@
 
 #include <lx_emul/extern_c_begin.h>
 
-#define DEBUG_COMPLETION 0
-#define DEBUG_DMA        0
-#define DEBUG_DRIVER     0
-#define DEBUG_IRQ        1
-#define DEBUG_KREF       0
-#define DEBUG_LINUX_PRINTK     1
-#define DEBUG_PCI        0
-#define DEBUG_SKB        0
-#define DEBUG_SLAB       0
-#define DEBUG_TIMER      0
-#define DEBUG_THREAD     0
-#define DEBUG_TRACE      1
+#define DEBUG_COMPLETION   0
+#define DEBUG_DMA          0
+#define DEBUG_DRIVER       0
+#define DEBUG_IRQ          1
+#define DEBUG_KREF         0
+#define DEBUG_LINUX_PRINTK 1
+#define DEBUG_PCI          0
+#define DEBUG_SKB          0
+#define DEBUG_SLAB         0
+#define DEBUG_TIMER        0
+#define DEBUG_THREAD       0
+#define DEBUG_TRACE        0
 
 #define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
 #define LINUX_VERSION_CODE KERNEL_VERSION(4,4,3)
@@ -915,7 +915,7 @@ int dev_pm_qos_expose_flags(struct device *dev, s32 value);
 #define dev_dbg_ratelimited(dev, format, arg...)
 
 
-#if DEBUG_PRINTK
+#if DEBUG_LINUX_PRINTK
 #define dev_dbg(dev, format, arg...)  lx_printf("dev_dbg: " format, ## arg)
 #define dev_vdbg(dev, format, arg...) lx_printf("dev_dbg: " format, ## arg)
 #define CONFIG_DYNAMIC_DEBUG
@@ -2689,7 +2689,7 @@ int ethtool_op_get_ts_info(struct net_device *, struct ethtool_ts_info *);
 
 #define netdev_for_each_mc_addr(a, b) if (0)
 
-#if DEBUG_PRINTK
+#if DEBUG_LINUX_PRINTK
 #define netif_dbg(priv, type, dev, fmt, args...) lx_printf("netif_dbg: "  fmt, ## args)
 #define netdev_dbg(dev, fmt, args...)  lx_printf("netdev_dbg: " fmt, ##args)
 #else
@@ -3206,6 +3206,8 @@ static inline void trace_xhci_dbg_cancel_urb(struct va_format *v) { }
 static inline void trace_xhci_dbg_reset_ep(struct va_format *v) { }
 static inline void trace_xhci_dbg_quirks(struct va_format *v) { }
 static inline void trace_xhci_dbg_address(struct va_format *v) { }
+
+void backtrace(void);
 
 #include <lx_emul/extern_c_end.h>
 
