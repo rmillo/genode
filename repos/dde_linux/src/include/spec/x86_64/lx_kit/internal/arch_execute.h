@@ -15,6 +15,23 @@
 #ifndef _ARCH_EXECUTE_H_
 #define _ARCH_EXECUTE_H_
 
+#if defined(USE_INTERNAL_SETJMP)
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define _JBLEN  12
+	typedef struct _jmp_buf { long _jb[_JBLEN]; } jmp_buf[1];
+
+	void    _longjmp(jmp_buf, int);
+	int     _setjmp(jmp_buf);
+
+#ifdef __cplusplus
+}
+#endif
+#endif /* USE_INTERNAL_SETJMP */
+
+
 static inline
 void arch_execute(void *sp, void *func, void *arg)
 {
