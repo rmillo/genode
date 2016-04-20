@@ -275,13 +275,6 @@ static inline void __read_once_size(const volatile void *p, void *res, int size)
 #define pr_debug(fmt, ...)
 #endif
 
-struct va_format
-{
-	const char *fmt;
-	va_list    *va;
-};
-
-
 static inline __printf(1, 2) int no_printk(const char *fmt, ...) { return 0; }
 
 
