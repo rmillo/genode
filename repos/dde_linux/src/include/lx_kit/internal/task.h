@@ -74,7 +74,7 @@ class Lx::Task : public Lx_kit::List<Lx::Task>::Element
 
 	private:
 
-		bool verbose = true;
+		bool verbose = false;
 
 		State _state = STATE_INIT;
 

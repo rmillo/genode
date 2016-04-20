@@ -86,8 +86,8 @@ class Lx_kit::Work : public Lx::Work
 
 	public:
 
-		Work(Genode::Allocator &alloc)
-		: _task(Work::run_work, reinterpret_cast<void*>(this), "work_queue",
+		Work(Genode::Allocator &alloc, char const *name = "work_queue")
+		: _task(Work::run_work, reinterpret_cast<void*>(this), name,
 		        Lx::Task::PRIORITY_2, Lx::scheduler()),
 		  _work_alloc(&alloc) { }
 
@@ -143,6 +143,8 @@ class Lx_kit::Work : public Lx::Work
 
 			return false;
 		}
+
+		char const *task_name() override { return _task.name(); }
 };
 
 
@@ -154,4 +156,17 @@ Lx::Work & Lx::Work::work_queue(Genode::Allocator *alloc)
 {
 	static Lx_kit::Work inst(*alloc);
 	return inst;
+}
+
+
+Lx::Work * Lx::Work::alloc_work_queue(Genode::Allocator *alloc, char const *name)
+{
+	Lx::Work *work = new (alloc) Lx_kit::Work(*alloc, name);
+	return work;
+}
+
+
+void Lx::Work::free_work_queue(Lx::Work *w)
+{
+	PERR("%s: IMPLEMENT ME", __func__);
 }

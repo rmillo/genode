@@ -18,26 +18,56 @@
 
 int schedule_work(struct work_struct *work)
 {
-	Lx::Work::work_queue().schedule(work);
-	Lx::Work::work_queue().unblock();
+	queue_work(work->wq ? work->wq : system_wq, work);
 	return 1;
+}
+
+
+bool queue_work(struct workqueue_struct *wq, struct work_struct *work)
+{
+	work->wq = wq;
+
+	/* check for separate work queue task */
+	if (wq && wq->task) {
+		Lx::Work *lx_work = (Lx::Work *)wq->task;
+		lx_work->schedule(work);
+		lx_work->unblock();
+	} else {
+		Lx::Work::work_queue().schedule(work);
+		Lx::Work::work_queue().unblock();
+	}
+
+	return true;
 }
 
 
 static void _schedule_delayed_work(unsigned long w)
 {
-	schedule_work((struct work_struct *)w);
+	delayed_work     *work = (delayed_work *)w;
+	workqueue_struct *wq   = work->wq;
+
+	/* check for separate work queue task */
+	if (wq && wq->task) {
+		Lx::Work *lx_work = (Lx::Work *)wq->task;
+		lx_work->schedule_delayed(work, 0);
+		lx_work->unblock();
+	} else {
+		Lx::Work::work_queue().schedule_delayed(work, 0);
+		Lx::Work::work_queue().unblock();
+	}
 }
 
 
 bool queue_delayed_work(struct workqueue_struct *wq,
                         struct delayed_work *dwork, unsigned long delay)
 {
+	dwork->wq = wq;
+
 	/* treat delayed work without delay like any other work */
 	if (delay == 0) {
-		schedule_work(&dwork->work);
+		_schedule_delayed_work((unsigned long)dwork);
 	} else {
-		setup_timer(&dwork->timer, _schedule_delayed_work, (unsigned long)&dwork->work);
+		setup_timer(&dwork->timer, _schedule_delayed_work, (unsigned long)dwork);
 		mod_timer(&dwork->timer, delay);
 	}
 	return true;
@@ -46,7 +76,7 @@ bool queue_delayed_work(struct workqueue_struct *wq,
 
 int schedule_delayed_work(struct delayed_work *dwork, unsigned long delay)
 {
-	return queue_delayed_work(system_wq, dwork, delay);
+	return queue_delayed_work(dwork->wq ? dwork->wq : system_wq, dwork, delay);
 }
 
 

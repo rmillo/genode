@@ -31,11 +31,15 @@ struct work_struct {
 	atomic_long_t data;
 	work_func_t func;
 	struct list_head entry;
+	struct workqueue_struct *wq;
 };
+
+struct workqueue_struct { void *task; };
 
 struct delayed_work {
 	struct timer_list timer;
 	struct work_struct work;
+	struct workqueue_struct *wq;
 };
 
 bool cancel_work_sync(struct work_struct *work);
@@ -73,7 +77,6 @@ bool flush_work_sync(struct work_struct *work);
 
 /* dummy for queue_delayed_work call in storage/usb.c */
 #define system_freezable_wq 0
-struct workqueue_struct { unsigned unused; };
 
 struct workqueue_struct *create_singlethread_workqueue(const char *name);
 struct workqueue_struct *alloc_ordered_workqueue(const char *fmt, unsigned int flags, ...) __printf(1, 3);

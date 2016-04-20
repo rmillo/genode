@@ -68,7 +68,7 @@ class Lx::Io_port
 		bool in(unsigned port, POD *val)
 		{
 			if (!_valid(port))
-				return false;;
+				return false;
 
 			switch (sizeof(POD)) {
 				case 1: *val = _port->inb(port); break;

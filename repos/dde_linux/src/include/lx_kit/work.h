@@ -26,6 +26,9 @@ class Lx::Work
 {
 	public:
 
+
+		virtual ~Work() { }
+
 		/**
 		 * Unblock corresponding task
 		 */
@@ -51,7 +54,14 @@ class Lx::Work
 		 */
 		virtual bool cancel_work(struct ::work_struct *, bool sync = false) = 0;
 
+		/**
+		 * Return task name
+		 */
+		virtual char const *task_name() = 0;
+
 		static Work &work_queue(Genode::Allocator *alloc = nullptr);
+		static Work *alloc_work_queue(Genode::Allocator *alloc, char const *name);
+		static void  free_work_queue(Work *W);
 };
 
 #endif /* _LX_KIT__WORK_H_ */
