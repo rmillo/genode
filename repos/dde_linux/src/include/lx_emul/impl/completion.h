@@ -93,7 +93,9 @@ void init_completion(struct completion *work)
 void complete(struct completion *work)
 {
 	work->done = 1;
-	static_cast<Lx::Task *>(work->task)->unblock();
+
+	Lx::Task *task = static_cast<Lx::Task*>(work->task);
+	if (task) { task->unblock(); }
 }
 
 
@@ -106,7 +108,7 @@ unsigned long wait_for_completion_timeout(struct completion *work,
 
 int wait_for_completion_interruptible(struct completion *work)
 {
-	__wait_completion(work, 0);;
+	__wait_completion(work, 0);
 	return 0;
 }
 
