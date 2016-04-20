@@ -26,8 +26,8 @@ usb.archive: dwc_otg.git
 #
 SRC_DIR_USB  := src/lib/usb
 VERSION_USB  := 4.4.3
-URL(usb)     := http://www.kernel.org/pub/linux/kernel/v4.x/linux-$(VERSION_USB).tar.gz
-SHA(usb)     := 6edf65aaf25bf23f366decbc088c81d6dbbb408b
+URL(usb)     := http://www.kernel.org/pub/linux/kernel/v4.x/linux-$(VERSION_USB).tar.xz
+SHA(usb)     := 336d66925a15ce9077cbf2c38acbdc6c2644e33f
 DIR(usb)     := $(SRC_DIR_USB)
 TAR_OPT(usb) := --strip-components=1 --files-from $(REP_DIR)/usb.list
 HASH_INPUT   += $(REP_DIR)/usb.list
@@ -43,8 +43,9 @@ DIR(dwc_otg) := $(SRC_DIR_USB)/drivers/usb/host/dwc_otg
 # Intel framebuffer driver
 #
 SRC_DIR_INTEL_FB  := src/drivers/framebuffer/intel
-URL(intel_fb)     := ${URL(usb)}
-SHA(intel_fb)     := ${SHA(usb)}
+VERSION_INTEL_FB  := 3.14.5
+URL(intel_fb)     := http://www.kernel.org/pub/linux/kernel/v3.x/linux-$(VERSION_INTEL_FB).tar.gz
+SHA(intel_fb)     := 675bb3446cbf0889d59a048f6af177ca0a7aacb5
 DIR(intel_fb)     := $(SRC_DIR_INTEL_FB)
 TAR_OPT(intel_fb) := --strip-components=1  --files-from $(REP_DIR)/intel_fb.list
 HASH_INPUT        += $(REP_DIR)/intel_fb.list
