@@ -26,6 +26,7 @@
 
 #include <lx_kit/backend_alloc.h>
 #include <lx_kit/irq.h>
+#include <lx_kit/pci_dev_registry.h>
 #include <lx_kit/scheduler.h>
 #include <lx_kit/work.h>
 
@@ -1371,9 +1372,24 @@ signed long schedule_timeout_uninterruptible(signed long timeout)
 long __wait_completion(struct completion *work, unsigned long timeout)
 {
 	//TODO: implement timeout
-	wait_queue_head_t wait;
-	_wait_event(wait, work->done);
+	while (!work->done) {
+		Lx::Task *task = Lx::scheduler().current();
+		work->task = (void *)task;
+		task->block_and_schedule();
+	}
 	work->done = 0;
+
+#if 0
+	work->task = (void *)Lx::scheduler().current();
+	wait_queue_head_t wait;
+	init_waitqueue_head(&wait);
+	prepare_to_wait(&wait, 0, 0);
+	_wait_event(wait, work->done);
+	PWRN("finished");
+	finish_wait(&wait, 0);
+	remove_wait_queue(&wait, 0);
+	work->done = 0;
+#endif
 	return 0;
 }
 
@@ -1395,6 +1411,7 @@ void tasklet_init(struct tasklet_struct *t, void (*f)(unsigned long), unsigned l
 void tasklet_schedule(struct tasklet_struct *tasklet)
 {
 	Lx::Work::work_queue().schedule_tasklet(tasklet);
+	Lx::Work::work_queue().unblock();
 }
 
 
@@ -1444,6 +1461,12 @@ bool queue_work(struct workqueue_struct *wq, struct work_struct *work)
 int request_irq(unsigned int irq, irq_handler_t handler, unsigned long flags,
                 const char *name, void *dev)
 {
-	PDBG("IMPLEMENT ME");
-	return 0;
+	for (Lx::Pci_dev *pci_dev =  Lx::pci_dev_registry()->first(); pci_dev; pci_dev = pci_dev->next())
+		if (pci_dev->irq == irq) {
+			PDBG("Rueest IRQ");
+			Lx::Irq::irq().request_irq(pci_dev->client(), handler, dev);
+			return 0;
+		}
+
+	return -ENODEV;
 }

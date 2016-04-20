@@ -134,4 +134,5 @@ void start_usb_driver(Server::Entrypoint &ep)
 	/* start driver thread */
 	Routine::main();
 #endif
+	PERR("WAIT");
 }

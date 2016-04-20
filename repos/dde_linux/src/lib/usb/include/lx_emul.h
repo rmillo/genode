@@ -34,7 +34,7 @@
 #define DEBUG_SLAB       0
 #define DEBUG_TIMER      0
 #define DEBUG_THREAD     0
-#define DEBUG_TRACE      0
+#define DEBUG_TRACE      1
 
 #define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
 #define LINUX_VERSION_CODE KERNEL_VERSION(4,4,3)
@@ -1937,7 +1937,7 @@ int match_octal(substring_t *, int *result);
 
 #include <lx_emul/completion.h>
 
-struct completion { unsigned int done; };
+struct completion { unsigned int done; void *task; };
 long  __wait_completion(struct completion *work, unsigned long timeout);;
 
 

@@ -14,7 +14,7 @@ lappend_if [have_spec gpio] build_components drivers/gpio
 source ${genode_dir}/repos/base/run/platform_drv.inc
 append_platform_drv_build_components
 
-build $build_components
+#build $build_components
 
 create_boot_directory
 
