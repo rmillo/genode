@@ -39,39 +39,6 @@ typedef Genode::size_t size_t;
 typedef Genode::addr_t addr_t;
 
 
-void Lx::debug_printf(int level, char const *fmt, ...)
-{
-	if (level) {
-		va_list va;
-		va_start(va, fmt);
-		Genode::vprintf(fmt, va);
-		va_end(va);
-	}
-}
-
-
-void Lx::printf(char const *fmt, ...)
-{
-	va_list va;
-	va_start(va, fmt);
-	Genode::vprintf(fmt, va);
-	va_end(va);
-}
-
-
-extern "C" void lx_printf(char const *fmt, ...)
-{
-	va_list va;
-	va_start(va, fmt);
-	Genode::vprintf(fmt, va);
-	va_end(va);
-}
-
-
-extern "C" void lx_vprintf(char const *fmt, va_list va) {
-	Genode::vprintf(fmt, va); }
-
-
 /********************
  ** linux/string.h **
  ********************/

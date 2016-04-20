@@ -35,10 +35,6 @@ namespace Lx
 	Genode::Ram_dataspace_capability backend_alloc(Genode::addr_t, Genode::Cache_attribute);
 	void backend_free(Genode::Ram_dataspace_capability);
 
-	void printf(char const *fmt, ...);
-	void debug_printf(int level, char const *fmt, ...);
-
-
 	void get_mac_address(unsigned char *);
 }
 
