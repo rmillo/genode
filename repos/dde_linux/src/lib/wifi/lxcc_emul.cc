@@ -1422,15 +1422,6 @@ int request_threaded_irq(unsigned int irq, irq_handler_t handler,
 #include <lx_emul/impl/work.h>
 
 
-bool queue_work(struct workqueue_struct *wq, struct work_struct *work)
-{
-	Lx::Work::work_queue().schedule(work);
-	Lx::Work::work_queue().unblock();
-
-	return true;
-}
-
-
 static void execute_delayed_work(unsigned long dwork)
 {
 	Lx::Work::work_queue().schedule_delayed((struct delayed_work *)dwork, 0);
@@ -1481,12 +1472,13 @@ void tasklet_hi_schedule(struct tasklet_struct *tasklet)
 #include <lx_emul/impl/completion.h>
 
 
-void __wait_completion(struct completion *work) { }
+long __wait_completion(struct completion *work, unsigned long timeout) {
+	return timeout ? 1 : 0; }
 
 
 int wait_for_completion_killable(struct completion *work)
 {
-	__wait_completion(work);
+	__wait_completion(work, 0);
 	return 0;
 }
 
@@ -1494,7 +1486,7 @@ int wait_for_completion_killable(struct completion *work)
 long wait_for_completion_killable_timeout(struct completion *work,
                                           unsigned long timeout)
 {
-	__wait_completion(work);
+	__wait_completion(work, 0);
 	return 1;
 }
 

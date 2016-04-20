@@ -42,6 +42,9 @@ extern "C" void module_arc4_init(void);
 extern "C" void module_chainiv_module_init(void);
 extern "C" void module_krng_mod_init(void);
 
+struct workqueue_struct *system_power_efficient_wq;
+struct workqueue_struct *system_wq;
+
 static bool mac80211_only = false;
 
 struct pernet_operations loopback_net_ops;
@@ -97,6 +100,9 @@ static Genode::Lock *_wpa_lock;
 
 static void run_linux(void *)
 {
+	system_power_efficient_wq = alloc_workqueue("system_power_efficient_wq", 0, 0); 
+	system_wq                 = alloc_workqueue("system_wq", 0, 0); 
+
 	core_sock_init();
 	core_netlink_proto_init();
 	module_packet_init();
@@ -144,9 +150,9 @@ void wifi_init(Server::Entrypoint &ep, Genode::Lock &lock)
 	/* add init_net namespace to namespace list */
 	list_add_tail_rcu(&init_net.list, &net_namespace_list);
 
-	Lx::Scheduler &sched = Lx::scheduler();
+	Lx::scheduler();
 
-	Lx::Timer &timer = Lx::timer(&ep, &jiffies);
+	Lx::timer(&ep, &jiffies);
 
 	Lx::Irq::irq(&ep, Genode::env()->heap());
 	Lx::Work::work_queue(Genode::env()->heap());

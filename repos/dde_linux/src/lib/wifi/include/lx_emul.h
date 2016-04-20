@@ -85,6 +85,8 @@ static inline void atomic_long_set(atomic_long_t *l, long i)
 
 #include <lx_emul/types.h>
 
+typedef int clockid_t;
+
 typedef size_t __kernel_size_t;
 typedef long   __kernel_time_t;
 typedef long   __kernel_suseconds_t;
@@ -404,13 +406,6 @@ void *__alloc_page_frag(struct page_frag_cache *nc,
 #include <lx_emul/semaphore.h>
 
 
-/*******************
- ** linux/timer.h **
- *******************/
-
-#include <lx_emul/timer.h>
-
-
 /********************
  ** linux/kernel.h **
  ********************/
@@ -462,6 +457,58 @@ int sscanf(const char *, const char *, ...);
 #define U32_MAX  ((u32)~0U)
 #define S32_MAX  ((s32)(U32_MAX>>1))
 #define S32_MIN  ((s32)(-S32_MAX - 1))
+
+
+/*********************
+ ** linux/jiffies.h **
+ *********************/
+
+#include <lx_emul/jiffies.h>
+
+static inline unsigned int jiffies_to_usecs(const unsigned long j) { return j * JIFFIES_TICK_US; }
+
+
+/******************
+ ** linux/time.h **
+ ******************/
+
+#include <lx_emul/time.h>
+
+enum {
+	MSEC_PER_SEC  = 1000L,
+	USEC_PER_SEC  = MSEC_PER_SEC * 1000L,
+	USEC_PER_MSEC = 1000L,
+};
+
+unsigned long get_seconds(void);
+void          getnstimeofday(struct timespec *);
+#define do_posix_clock_monotonic_gettime(ts) ktime_get_ts(ts)
+
+#define ktime_to_ns(kt) ((kt).tv64)
+
+struct timespec ktime_to_timespec(const ktime_t kt);
+bool ktime_to_timespec_cond(const ktime_t kt, struct timespec *ts);
+
+int     ktime_equal(const ktime_t, const ktime_t);
+s64     ktime_us_delta(const ktime_t, const ktime_t);
+
+static inline s64 ktime_to_ms(const ktime_t kt)
+{
+	return kt.tv64 / NSEC_PER_MSEC;
+}
+
+static inline void ktime_get_ts(struct timespec *ts)
+{
+	ts->tv_sec  = jiffies * (1000/HZ);
+	ts->tv_nsec = 0;
+}
+
+
+/*******************
+ ** linux/timer.h **
+ *******************/
+
+#include <lx_emul/timer.h>
 
 
 /*********************
@@ -768,12 +815,6 @@ enum {
 	DUMP_PREFIX_OFFSET
 };
 
-struct va_format
-{
-	const char *fmt;
-	va_list *va;
-};
-
 int snprintf(char *str, size_t size, const char *format, ...) __attribute__((format(printf, 3, 4)));
 
 static inline void print_hex_dump(const char *level, const char *prefix_str,
@@ -809,15 +850,19 @@ enum {
 struct work_struct;
 typedef void (*work_func_t)(struct work_struct *work);
 
+struct workqueue_struct;
+
 struct work_struct {
 	atomic_long_t data;
 	work_func_t func;
 	struct list_head entry;
+	struct workqueue_struct *wq;
 };
 
 struct delayed_work {
 	struct timer_list timer;
 	struct work_struct work;
+	struct workqueue_struct *wq;
 };
 
 bool cancel_work_sync(struct work_struct *work);
@@ -854,7 +899,7 @@ bool flush_work_sync(struct work_struct *work);
 
 /* dummy for queue_delayed_work call in storage/usb.c */
 #define system_freezable_wq 0
-struct workqueue_struct { unsigned unused; };
+struct workqueue_struct { void *task; };
 
 struct workqueue_struct *create_singlethread_workqueue(const char *name);
 struct workqueue_struct *alloc_ordered_workqueue(const char *fmt, unsigned int flags, ...) __printf(1, 3);
@@ -1914,51 +1959,6 @@ void hlist_add_before_rcu(struct hlist_node *,struct hlist_node *);
 void list_replace_rcu(struct list_head *, struct list_head *);
 
 #include <linux/hashtable.h>
-
-
-/*********************
- ** linux/jiffies.h **
- *********************/
-
-#include <lx_emul/jiffies.h>
-
-static inline unsigned int jiffies_to_usecs(const unsigned long j) { return j * JIFFIES_TICK_US; }
-
-
-/******************
- ** linux/time.h **
- ******************/
-
-#include <lx_emul/time.h>
-
-enum {
-	MSEC_PER_SEC  = 1000L,
-	USEC_PER_SEC  = MSEC_PER_SEC * 1000L,
-	USEC_PER_MSEC = 1000L,
-};
-
-unsigned long get_seconds(void);
-void          getnstimeofday(struct timespec *);
-#define do_posix_clock_monotonic_gettime(ts) ktime_get_ts(ts)
-
-#define ktime_to_ns(kt) ((kt).tv64)
-
-struct timespec ktime_to_timespec(const ktime_t kt);
-bool ktime_to_timespec_cond(const ktime_t kt, struct timespec *ts);
-
-int     ktime_equal(const ktime_t, const ktime_t);
-s64     ktime_us_delta(const ktime_t, const ktime_t);
-
-static inline s64 ktime_to_ms(const ktime_t kt)
-{
-	return kt.tv64 / NSEC_PER_MSEC;
-}
-
-static inline void ktime_get_ts(struct timespec *ts)
-{
-	ts->tv_sec  = jiffies * (1000/HZ);
-	ts->tv_nsec = 0;
-}
 
 
 /***********************
@@ -3276,9 +3276,13 @@ static inline int is_device_dma_capable(struct device *dev) { return *dev->dma_m
  ** linux/completion.h **
  ************************/
 
-struct completion { unsigned done; };
+struct completion
+{
+	unsigned  done;
+	void     *task;
+};
 
-void __wait_completion(struct completion *work);
+long __wait_completion(struct completion *work, unsigned long timeout);
 void complete(struct completion *);
 void complete_all(struct completion *);
 void init_completion(struct completion *x);
@@ -3525,13 +3529,6 @@ void *__alloc_percpu(size_t size, size_t align);
 
 #define __this_cpu_inc(pcp) this_cpu_inc(pcp)
 #define __this_cpu_dec(pcp) this_cpu_dec(pcp)
-
-
-/*********************
- ** linux/hrtimer.h **
- *********************/
-
-struct hrtimer { unsigned unused; };
 
 
 /*******************
