@@ -76,6 +76,12 @@ class Lx::Pci_dev : public pci_dev, public Lx_kit::List<Pci_dev>::Element
 			}
 		}
 
+		static unsigned _virq_num()
+		{
+			static unsigned instance = 128;
+			return ++instance;
+		}
+
 	public:
 
 		/**
@@ -99,8 +105,18 @@ class Lx::Pci_dev : public pci_dev, public Lx_kit::List<Pci_dev>::Element
 			this->dev.dma_mask = &this->dev._dma_mask_buf;
 			this->dev.coherent_dma_mask = ~0;
 
-			/* read interrupt line */
-			this->irq = _client.config_read(IRQ, Device::ACCESS_8BIT);
+			enum { USB_SUB_CLASS = 0xc0300 };
+
+			/*
+			 * For USB we generate virtual IRQ numbers so we can identify the device
+			 * later on
+			 */
+			if ((class_ & ~0xffU) == USB_SUB_CLASS)
+				this->irq = _virq_num();
+			else
+				/* read interrupt line */
+				this->irq = _client.config_read(IRQ, Device::ACCESS_8BIT);
+
 
 			/* hide ourselfs in  bus structure */
 			this->bus = (struct pci_bus *)this;

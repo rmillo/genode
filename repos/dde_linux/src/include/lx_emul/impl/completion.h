@@ -93,6 +93,7 @@ void init_completion(struct completion *work)
 void complete(struct completion *work)
 {
 	work->done = 1;
+	static_cast<Lx::Task *>(work->task)->unblock();
 }
 
 
