@@ -45,6 +45,11 @@ class Lx::Scheduler
 		virtual void add(Task *task) = 0;
 
 		/**
+		 * Remove a task
+		 */
+		virtual void remove(Task *task) = 0;
+
+		/**
 		 * Schedule all present tasks
 		 *
 		 * Returns if no task is runnable.

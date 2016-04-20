@@ -128,6 +128,11 @@ class Lx_kit::Scheduler : public Lx::Scheduler
 				_present_list.append(task);
 		}
 
+		void remove(Lx::Task *task) override
+		{
+			_present_list.remove(task);
+		}
+
 		void schedule() override
 		{
 			bool at_least_one = false;
@@ -199,6 +204,8 @@ Lx::Task::Task(void (*func)(void*), void *arg, char const *name,
 
 Lx::Task::~Task()
 {
+	_scheduler.remove(this);
+
 	if (_stack)
 		Genode::Thread_base::myself()->free_secondary_stack(_stack);
 }
