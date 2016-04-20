@@ -81,23 +81,6 @@ void Lx::backend_free(Genode::Ram_dataspace_capability cap)
 }
 
 
-/***************
- ** Lx printf **
- ***************/
-
-void lx_printf(char const *fmt, ...) 
-{
-	va_list va;
-	va_start(va, fmt);
-	Genode::vprintf(fmt, va); 
-	va_end(va);
-}
-
-
-void lx_vprintf(char const *fmt, va_list va) {
-	Genode::vprintf(fmt, va); }
-
-
 /*************************************
  ** Memory allocation, linux/slab.h **
  *************************************/
