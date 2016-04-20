@@ -1,9 +1,23 @@
-#include <lx_emul/extern_c_begin.h>
-#include <lx_emul.h>
-#include <lx_emul/extern_c_end.h>
+/*
+ * \brief  Linux kit memory allocator
+ * \author Sebastian Sumpf
+ * \date   2016-04-20
+ */
 
+/*
+ * Copyright (C) 2016 Genode Labs GmbH
+ *
+ * This file is part of the Genode OS framework, which is distributed
+ * under the terms of the GNU General Public License version 2.
+ */
+
+/* Genode includes */
 #include <base/console.h>
 #include <base/printf.h>
+
+/* local includes */
+#include <lx_emul.h>
+
 
 namespace Lx { class Console; }
 
@@ -384,7 +398,7 @@ class Lx::Console
 					case Format_command::MAC: /* %pM */
 					{
 						unsigned char const *mac = va_arg(list, unsigned char const *);
-						for (int i = 0; i < ETH_ALEN; i++) {
+						for (int i = 0; i < 6; i++) {
 							if (i) _out_char(':');
 							_out_unsigned<unsigned char>(mac[i], cmd.base, cmd.padding);
 						}
