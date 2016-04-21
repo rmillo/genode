@@ -47,7 +47,7 @@ class Lx::Timer
 		/**
 		 * Add new linux timer
 		 */
-		virtual void add(void *timer, Type type = LIST) = 0;
+		virtual void add(void *timer, Type type) = 0;
 
 		/**
 		 * Delete linux timer

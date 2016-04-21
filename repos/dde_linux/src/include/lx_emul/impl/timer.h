@@ -21,7 +21,7 @@ void init_timer(struct timer_list *timer) { }
 int mod_timer(struct timer_list *timer, unsigned long expires)
 {
 	if (!Lx::timer().find(timer))
-		Lx::timer().add(timer);
+		Lx::timer().add(timer, Lx::Timer::LIST);
 
 	return Lx::timer().schedule(timer, expires);
 }
@@ -62,7 +62,7 @@ int hrtimer_start_range_ns(struct hrtimer *timer, ktime_t tim,
 	unsigned long expires = tim.tv64 / (NSEC_PER_MSEC * HZ);
 
 	if (!Lx::timer().find(timer))
-		Lx::timer().add(timer);
+		Lx::timer().add(timer, Lx::Timer::HR);
 
 	return Lx::timer().schedule(timer, expires);
 }
