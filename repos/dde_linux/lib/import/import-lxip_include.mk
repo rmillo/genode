@@ -12,6 +12,16 @@ ifeq ($(filter-out $(SPECS),x86),)
   endif # 64bit
 endif # x86
 
+ifeq ($(filter-out $(SPECS),arm),)
+  ARCH_SRC_INC_DIR += $(REP_DIR)/src/include/spec/arm
+  ifeq ($(filter-out $(SPECS),arm_v6),)
+    ARCH_SRC_INC_DIR += $(REP_DIR)/src/include/spec/arm_v6
+  endif # arm_v6
+  ifeq ($(filter-out $(SPECS),arm_v7),)
+    ARCH_SRC_INC_DIR += $(REP_DIR)/src/include/spec/arm_v7
+  endif # arm_v7
+endif # arm
+
 #
 # The order of include-search directories is important, we need to look into
 # 'contrib' before falling back to our custom 'lx_emul.h' header.
