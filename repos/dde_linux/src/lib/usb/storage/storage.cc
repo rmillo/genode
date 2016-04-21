@@ -20,6 +20,7 @@
 #include <lx_emul.h>
 
 #include <lx_kit/backend_alloc.h>
+#include <lx_kit/scheduler.h>
 
 #include <extern_c_begin.h>
 #include <storage/scsi.h>
@@ -128,6 +129,9 @@ class Storage_device : public Genode::List<Storage_device>::Element,
 
 			/* send command to host driver */
 			_sdev->host->hostt->queuecommand(_sdev->host, cmnd);
+
+			/* schedule next task */
+			Lx::scheduler().schedule();
 		}
 
 	public:

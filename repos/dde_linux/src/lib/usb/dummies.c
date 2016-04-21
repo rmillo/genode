@@ -229,7 +229,6 @@ int signal_pending(struct task_struct *p) { TRACE; return 0; }
 void schedule(void) { TRACE; }
 void yield(void) { TRACE; }
 void cpu_relax(void) { TRACE; udelay(1); }
-signed long schedule_timeout(signed long timeout) { TRACE; return 0; }
 
 struct task_struct *current;
 

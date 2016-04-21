@@ -1078,9 +1078,9 @@ int dma_map_sg_attrs(struct device *dev, struct scatterlist *sg,
 struct task_struct *kthread_run(int (*fn)(void *), void *arg, const char *n, ...)
 {
 	lx_log(DEBUG_THREAD, "Run %s", n);
-	PDBG("IMPLEMENT ME!");
-	//Routine::add(fn, arg, n);
-	//TODO: TASK
+	new (Genode::env()->heap()) Lx::Task((void (*)(void *))fn, arg, n,
+	                                     Lx::Task::PRIORITY_2,
+	                                     Lx::scheduler());
 	return 0;
 }
 
@@ -1359,7 +1359,7 @@ int blocking_notifier_call_chain(struct blocking_notifier_head *nh,
  *******************/
 
 #include <lx_emul/impl/timer.h>
-
+#include <lx_emul/impl/sched.h>
 
 signed long schedule_timeout_uninterruptible(signed long timeout)
 {
@@ -1406,8 +1406,9 @@ void tasklet_init(struct tasklet_struct *t, void (*f)(unsigned long), unsigned l
 
 void tasklet_schedule(struct tasklet_struct *tasklet)
 {
-	Lx::Work::work_queue().schedule_tasklet(tasklet);
-	Lx::Work::work_queue().unblock();
+	Lx::Work *lx_work = (Lx::Work *)system_wq->task;
+	lx_work->schedule_tasklet(tasklet);
+	lx_work->unblock();
 }
 
 

@@ -102,7 +102,7 @@ catch { exec sh -c $cmd }
 #
 # Qemu opts for UHCI
 #
-#append qemu_args " -m 64 -nographic -usbdevice disk::$disk_image -boot order=d"
+#append qemu_args " -m 128 -nographic -usbdevice disk::$disk_image -boot order=d"
 
 #
 # Qemu opts for EHCI
