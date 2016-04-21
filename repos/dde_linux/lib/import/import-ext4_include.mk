@@ -3,7 +3,7 @@ SRC_DIR          := $(REP_DIR)/src/lib/ext4
 
 # architecture-dependent includes
 ifeq ($(filter-out $(SPECS),x86),)
-  ARCH_SRC_INC_DIR += $(REP_DIR)/src/include/x86
+  ARCH_SRC_INC_DIR += $(REP_DIR)/src/include/spec/x86
   ifeq ($(filter-out $(SPECS),32bit),)
     ARCH_SRC_INC_DIR += $(REP_DIR)/src/include/spec/x86_32
   endif # 32bit
