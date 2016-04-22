@@ -324,6 +324,12 @@ __wsum csum_block_add(__wsum csum, __wsum csum2, int offset)
 }
 
 
+__wsum csum_block_add_ext(__wsum csum, __wsum csum2, int offset, int len)
+{
+	return csum_block_add(csum, csum2, offset);
+}
+
+
 /***************************
  ** Linux socket function **
  ***************************/

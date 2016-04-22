@@ -129,6 +129,14 @@ void *kmem_cache_alloc_node(struct kmem_cache *cache, gfp_t flags, int node)
 	return (void*)cache->alloc();
 }
 
+void *kmem_cache_zalloc(struct kmem_cache *cache, gfp_t flags)
+{
+	void *addr = (void*)cache->alloc();
+	if (addr) { memset(addr, 0, cache->size()); }
+
+	return addr;
+}
+
 
 /*********************
  ** linux/vmalloc.h **
@@ -548,7 +556,7 @@ size_t csum_and_copy_from_iter(void *addr, size_t bytes, __wsum *csum, struct io
 	char             *kdata = reinterpret_cast<char*>(addr);
 	struct iovec const *iov = i->iov;
 
-	__wsum sum = 0;
+	__wsum sum = *csum;
 	size_t len = bytes;
 	while (len > 0) {
 		if (iov->iov_len) {
@@ -588,7 +596,7 @@ size_t csum_and_copy_to_iter(void *addr, size_t bytes, __wsum *csum, struct iov_
 	char             *kdata = reinterpret_cast<char*>(addr);
 	struct iovec const *iov = i->iov;
 
-	__wsum sum = 0;
+	__wsum sum = *csum;
 	size_t len = bytes;
 	while (len > 0) {
 		if (iov->iov_len) {
