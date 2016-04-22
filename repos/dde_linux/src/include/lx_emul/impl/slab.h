@@ -138,11 +138,16 @@ void *kmemdup(const void *src, size_t size, gfp_t flags)
 
 struct kmem_cache : Lx::Slab_alloc
 {
+	size_t _object_size;
+
 	kmem_cache(size_t object_size, bool dma)
 	:
 		Lx::Slab_alloc(object_size, dma ? Lx::Slab_backend_alloc::dma()
-		                                : Lx::Slab_backend_alloc::mem())
+		                                : Lx::Slab_backend_alloc::mem()),
+		_object_size(object_size)
 	{ }
+
+	size_t size() const { return _object_size; }
 };
 
 
