@@ -56,6 +56,6 @@ linux-4.4.3/include/asm-generic/bitops/fls.h
 linux-4.4.3/include/asm-generic/bitops/fls64.h
 linux-4.4.3/include/asm-generic/bitops/non-atomic.h
 linux-4.4.3/include/linux/list.h
-linux-4.4.3/include/linux/jdb2.h
+linux-4.4.3/include/linux/jbd2.h
 linux-4.4.3/include/uapi/linux/byteorder/little_endian.h
 linux-4.4.3/include/uapi/linux/swab.h
