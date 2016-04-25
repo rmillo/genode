@@ -1474,7 +1474,7 @@ int seq_putc(struct seq_file *, char);
 #include <lx_emul/gfp.h>
 
 enum {
-	GFP_NOIO     = __GFP_WAIT,
+	GFP_NOIO     = GFP_LX_DMA,
 	GFP_NOWAIT   = 0x2000000u,
 };
 
