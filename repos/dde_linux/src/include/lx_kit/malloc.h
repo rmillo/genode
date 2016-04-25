@@ -39,6 +39,10 @@ class Lx::Malloc
 
 		virtual void free(void const *a) = 0;
 
+		virtual void *alloc_large(size_t size) = 0;
+
+		virtual void free_large(void *ptr) = 0;
+
 		virtual size_t size(void const *a) = 0;
 
 		virtual Genode::addr_t phys_addr(void *a) = 0;

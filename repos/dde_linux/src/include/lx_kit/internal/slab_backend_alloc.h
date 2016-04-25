@@ -40,6 +40,7 @@ class Lx::Slab_backend_alloc : public Genode::Allocator
 		 * Allocate
 		 */
 		virtual bool alloc(size_t size, void **out_addr) = 0;
+		virtual void free(void *addr) = 0;
 
 		/**
 		 * Return phys address for given virtual addr.

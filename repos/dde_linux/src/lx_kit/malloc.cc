@@ -39,9 +39,10 @@ class Lx_kit::Slab_backend_alloc : public Lx::Slab_backend_alloc,
 	private:
 
 		enum {
-			VM_SIZE    = 24 * 1024 * 1024,     /* size of VM region to reserve */
-			BLOCK_SIZE = 1024  * 1024,         /* 1 MiB */
-			ELEMENTS   = VM_SIZE / BLOCK_SIZE, /* MAX number of dataspaces in VM */
+			VM_SIZE    = 64 * 1024 * 1024,       /* size of VM region to reserve */
+			P_BLOCK_SIZE  = 2 * 1024 * 1024,     /* 2 MB physical contiguous */
+			V_BLOCK_SIZE  = P_BLOCK_SIZE * 2,    /* 2 MB virtual used, 2 MB virtual left free to avoid that Allocator_avl merges virtual contiguous regions which are physically non-contiguous */
+			ELEMENTS   = VM_SIZE / V_BLOCK_SIZE, /* MAX number of dataspaces in VM */
 		};
 
 		addr_t                           _base;              /* virt. base address */
@@ -59,19 +60,19 @@ class Lx_kit::Slab_backend_alloc : public Lx::Slab_backend_alloc,
 			}
 
 			try {
-				_ds_cap[_index] = Lx::backend_alloc(BLOCK_SIZE, _cached);
-				/* attach at index * BLOCK_SIZE */
-				Rm_connection::attach_at(_ds_cap[_index], _index * BLOCK_SIZE, BLOCK_SIZE, 0);
+				_ds_cap[_index] = Lx::backend_alloc(P_BLOCK_SIZE, _cached);
+				/* attach at index * V_BLOCK_SIZE */
+				Rm_connection::attach_at(_ds_cap[_index], _index * V_BLOCK_SIZE, P_BLOCK_SIZE, 0);
 
 				/* lookup phys. address */
 				_ds_phys[_index] = Genode::Dataspace_client(_ds_cap[_index]).phys_addr();
 			} catch (...) { return false; }
 
 			/* return base + offset in VM area */
-			addr_t block_base = _base + (_index * BLOCK_SIZE);
+			addr_t block_base = _base + (_index * V_BLOCK_SIZE);
 			++_index;
 
-			_range.add_range(block_base, BLOCK_SIZE);
+			_range.add_range(block_base, P_BLOCK_SIZE);
 			return true;
 		}
 
@@ -118,6 +119,9 @@ class Lx_kit::Slab_backend_alloc : public Lx::Slab_backend_alloc,
 			return _range.alloc(size, out_addr);
 		}
 
+		void free(void *addr) {
+			_range.free(addr); }
+
 		void   free(void *addr, size_t size) override { _range.free(addr, size); }
 		size_t overhead(size_t size) const override { return  0; }
 		bool need_size_for_free() const override { return false; }
@@ -127,7 +131,7 @@ class Lx_kit::Slab_backend_alloc : public Lx::Slab_backend_alloc,
 			if (addr < _base || addr >= (_base + VM_SIZE))
 				return ~0UL;
 
-			int index = (addr - _base) / BLOCK_SIZE;
+			int index = (addr - _base) / V_BLOCK_SIZE;
 
 			/* physical base of dataspace */
 			addr_t phys = _ds_phys[index];
@@ -136,7 +140,7 @@ class Lx_kit::Slab_backend_alloc : public Lx::Slab_backend_alloc,
 				return ~0UL;
 
 			/* add offset */
-			phys += (addr - _base - (index * BLOCK_SIZE));
+			phys += (addr - _base - (index * V_BLOCK_SIZE));
 			return phys;
 		}
 
@@ -144,8 +148,8 @@ class Lx_kit::Slab_backend_alloc : public Lx::Slab_backend_alloc,
 		{
 			for (unsigned i = 0; i < ELEMENTS; i++) {
 				if (_ds_cap[i].valid() &&
-				    phys >= _ds_phys[i] && phys < _ds_phys[i] + BLOCK_SIZE)
-					return _base + i*BLOCK_SIZE + phys - _ds_phys[i];
+				    phys >= _ds_phys[i] && phys < _ds_phys[i] + P_BLOCK_SIZE)
+					return _base +  i * V_BLOCK_SIZE + phys - _ds_phys[i];
 			}
 
 			PWRN("virt_addr(0x%lx) - no translation", phys);
@@ -309,6 +313,23 @@ class Lx_kit::Malloc : public Lx::Malloc
 			/* we need to decrease addr by 2, orig_size and index come first */
 			_allocator[nr]->free((void *)(addr - 2));
 		}
+
+		void *alloc_large(size_t size)
+		{
+			void *addr;
+			if (!_back_allocator.alloc(size, &addr)) {
+				PERR("Large back end allocation failed (%zu bytes)", size);
+				return nullptr;
+			}
+
+			return addr;
+		}
+
+		void free_large(void *ptr)
+		{
+			_back_allocator.free(ptr);
+		}
+
 
 		size_t size(void const *a)
 		{
