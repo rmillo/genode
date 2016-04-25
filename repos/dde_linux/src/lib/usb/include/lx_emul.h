@@ -3182,13 +3182,6 @@ static inline int is_targeted(struct usb_device *dev) { return 0; }
 #define TP_ARGS(args...)      (args)
 #define TP_printk(fmt, args...) (fmt "\n" args)
 #define TP_fast_assign(args...) (args)
-/*
- * #define TP_ARGS(args...)      (args)
- * #define TP_CONDITION(args...) (args)
- * #define TP_STRUCT__entry(args...) (args)
- *
- * #define TP_fast_assign(args...) (args)
- * */
 
 
 /*******************

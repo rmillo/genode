@@ -22,10 +22,10 @@
 #include <lx_kit/backend_alloc.h>
 #include <lx_kit/scheduler.h>
 
-#include <extern_c_begin.h>
+#include <lx_emul/extern_c_begin.h>
 #include <storage/scsi.h>
 #include <drivers/usb/storage/usb.h>
-#include <extern_c_end.h>
+#include <lx_emul/extern_c_end.h>
 
 #include <platform/lx_mem.h>
 #include "signal.h"

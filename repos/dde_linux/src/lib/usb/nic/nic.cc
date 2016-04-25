@@ -20,10 +20,10 @@
 #include <os/config.h>
 
 #include <lx_emul.h>
-#include <extern_c_begin.h>
+#include <lx_emul/extern_c_begin.h>
 #include <linux/usb.h>
 #include <linux/usb/usbnet.h>
-#include <extern_c_end.h>
+#include <lx_emul/extern_c_end.h>
 
 #include <usb_nic_component.h>
 #include "signal.h"
