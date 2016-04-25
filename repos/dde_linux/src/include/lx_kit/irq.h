@@ -18,7 +18,7 @@
 
 /* Genode includes */
 #include <os/server.h>
-#include <platform_device/client.h>
+#include <platform_device/platform_device.h>
 
 
 namespace Lx { class Irq; }

@@ -32,7 +32,7 @@ int  _setjmp(jmp_buf);
 
 
 static inline
-void platform_execute(void *sp, void *func, void *arg)
+void arch_execute(void *sp, void *func, void *arg)
 {
 	asm volatile ("mov r0, %2;"  /* set arg */
 	              "mov sp, %0;"  /* set stack */
