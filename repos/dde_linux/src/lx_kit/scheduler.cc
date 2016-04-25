@@ -115,6 +115,9 @@ class Lx_kit::Scheduler : public Lx::Scheduler
 			return _current;
 		}
 
+		bool active() const override {
+			return _current != nullptr; }
+
 		void add(Lx::Task *task) override
 		{
 			Lx::Task *p = _present_list.first();

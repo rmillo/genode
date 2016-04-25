@@ -97,8 +97,8 @@ class Lx_kit::Work : public Lx::Work
 		void exec()
 		{
 			while (Context *c = _list.first()) {
-				c->exec();
 				_list.remove(c);
+				c->exec();
 				destroy(&_work_alloc, c);
 			}
 		}

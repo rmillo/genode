@@ -40,6 +40,11 @@ class Lx::Scheduler
 		virtual Task *current() = 0;
 
 		/**
+		 * Return true if a task is currently running
+		 */
+		virtual bool active() const = 0;
+
+		/**
 		 * Add new task to the present list
 		 */
 		virtual void add(Task *task) = 0;
