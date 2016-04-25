@@ -228,7 +228,7 @@ void __set_current_state(int state) { TRACE; }
 int signal_pending(struct task_struct *p) { TRACE; return 0; }
 void schedule(void) { TRACE; }
 void yield(void) { TRACE; }
-void cpu_relax(void) { TRACE; udelay(1); }
+void cpu_relax(void) { SKIP; }
 
 struct task_struct *current;
 
@@ -805,8 +805,8 @@ unsigned int queue_max_hw_sectors(struct request_queue *q) { TRACE; return 0; }
  ** scsi/scsi_cmnd.h **
  **********************/
 
-void scsi_set_resid(struct scsi_cmnd *cmd, int resid) { TRACE; }
-int scsi_get_resid(struct scsi_cmnd *cmd) { TRACE; return 0; }
+void scsi_set_resid(struct scsi_cmnd *cmd, int resid) { SKIP; }
+int scsi_get_resid(struct scsi_cmnd *cmd) { SKIP; return 0; }
 
 
 /********************

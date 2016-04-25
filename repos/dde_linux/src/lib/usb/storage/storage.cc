@@ -130,8 +130,9 @@ class Storage_device : public Genode::List<Storage_device>::Element,
 			/* send command to host driver */
 			_sdev->host->hostt->queuecommand(_sdev->host, cmnd);
 
-			/* schedule next task */
-			Lx::scheduler().schedule();
+			/* schedule next task if we come from EP */
+			if (Lx::scheduler().active() == false)
+				Lx::scheduler().schedule();
 		}
 
 	public:

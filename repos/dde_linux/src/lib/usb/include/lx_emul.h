@@ -33,7 +33,7 @@
 #define DEBUG_SLAB         0
 #define DEBUG_TIMER        0
 #define DEBUG_THREAD       0
-#define DEBUG_TRACE        1
+#define DEBUG_TRACE        0
 
 #define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
 #define LINUX_VERSION_CODE KERNEL_VERSION(4,4,3)
