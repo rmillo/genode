@@ -12,7 +12,6 @@
  */
 
 #include <platform.h>
-#include <platform/platform.h>
 
 
 extern "C" void module_ax88179_178a_driver_init();

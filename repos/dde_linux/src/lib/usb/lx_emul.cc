@@ -19,16 +19,12 @@
 #include <timer_session/connection.h>
 #include <util/string.h>
 
-#include <util/backtrace.h>
-
 /* Local includes */
 #include "signal.h"
-#include "platform/lx_mem.h"
 #include "lx_emul.h"
 
 #include <lx_kit/backend_alloc.h>
 #include <lx_kit/irq.h>
-#include <lx_kit/pci_dev_registry.h>
 #include <lx_kit/scheduler.h>
 #include <lx_kit/work.h>
 
@@ -41,11 +37,6 @@ namespace Genode {
 }
 
 unsigned long jiffies;
-
-void backtrace(void)
-{
-	Genode::print_backtrace();
-}
 
 
 /***********************
@@ -1020,19 +1011,3 @@ struct workqueue_struct *alloc_workqueue(const char *fmt, unsigned int flags,
 
 #include <lx_emul/impl/wait.h>
 
-
-/***********************
- ** linux/interrupt.h **
- ***********************/
-
-int request_irq(unsigned int irq, irq_handler_t handler, unsigned long flags,
-                const char *name, void *dev)
-{
-	for (Lx::Pci_dev *pci_dev =  Lx::pci_dev_registry()->first(); pci_dev; pci_dev = pci_dev->next())
-		if (pci_dev->irq == irq) {
-			Lx::Irq::irq().request_irq(pci_dev->client(), handler, dev);
-			return 0;
-		}
-
-	return -ENODEV;
-}

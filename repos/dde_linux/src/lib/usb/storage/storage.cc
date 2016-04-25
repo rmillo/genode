@@ -27,7 +27,6 @@
 #include <drivers/usb/storage/usb.h>
 #include <lx_emul/extern_c_end.h>
 
-#include <platform/lx_mem.h>
 #include "signal.h"
 
 static Signal_helper *_signal = 0;

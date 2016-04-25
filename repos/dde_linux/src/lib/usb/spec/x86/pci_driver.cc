@@ -1,9 +1,24 @@
+/**
+ * \brief  PCI device handling
+ * \author Sebastian Sumpf
+ * \date   2016-04-25
+ */
+
+/*
+ * Copyright (C) 2016 Genode Labs GmbH
+ *
+ * This file is part of the Genode OS framework, which is distributed
+ * under the terms of the GNU General Public License version 2.
+ */
+
+#include <base/allocator.h>
 #include <base/lock.h>
 #include <base/signal.h>
 #include <util/misc_math.h>
 
 #include <lx_emul.h>
 
+#include <lx_kit/irq.h>
 #include <lx_kit/pci_dev_registry.h>
 #include <lx_kit/mapped_io_mem_range.h>
 
@@ -243,3 +258,18 @@ extern "C" int pci_bus_write_config_dword(struct pci_bus *bus, unsigned int, int
 }
 
 
+/***********************
+ ** linux/interrupt.h **
+ ***********************/
+
+int request_irq(unsigned int irq, irq_handler_t handler, unsigned long flags,
+                const char *name, void *dev)
+{
+	for (Lx::Pci_dev *pci_dev =  Lx::pci_dev_registry()->first(); pci_dev; pci_dev = pci_dev->next())
+		if (pci_dev->irq == irq) {
+			Lx::Irq::irq().request_irq(pci_dev->client(), handler, dev);
+			return 0;
+		}
+
+	return -ENODEV;
+}

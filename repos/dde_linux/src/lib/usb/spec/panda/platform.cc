@@ -11,7 +11,6 @@
  * under the terms of the GNU General Public License version 2.
  */
 
-#include <platform/platform.h>
 #include <platform.h>
 
 #include <drivers/board_base.h>
