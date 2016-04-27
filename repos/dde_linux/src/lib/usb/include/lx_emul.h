@@ -902,17 +902,29 @@ int dev_pm_qos_add_request(struct device *dev, struct dev_pm_qos_request *req,
 int dev_pm_qos_remove_request(struct dev_pm_qos_request *req);
 int dev_pm_qos_expose_flags(struct device *dev, s32 value);
 
+
+/******************
+ ** linux/acpi.h **
+ ******************/
+
+#define ACPI_PTR(_ptr)  (NULL)
+
+
 /********************
  ** linux/device.h **
  ********************/
 
-#define dev_info(dev, format, arg...) lx_printf("dev_info: "  format, ## arg)
-#define dev_warn(dev, format, arg...) lx_printf("dev_warn: "  format, ## arg)
-#define dev_WARN(dev, format, arg...) lx_printf("dev_WARN: "  format, ## arg)
-#define dev_err( dev, format, arg...) lx_printf("dev_error: " format, ## arg)
-#define dev_notice(dev, format, arg...) lx_printf("dev_notice: " format, ## arg)
+#define dev_info(dev, format, arg...)      lx_printf("dev_info: "  format, ## arg)
+#define dev_warn(dev, format, arg...)      lx_printf("dev_warn: "  format, ## arg)
+#define dev_WARN(dev, format, arg...)      lx_printf("dev_WARN: "  format, ## arg)
+#define dev_err( dev, format, arg...)      lx_printf("dev_error: " format, ## arg)
+#define dev_notice(dev, format, arg...)    lx_printf("dev_notice: " format, ## arg)
 #define dev_dbg_ratelimited(dev, format, arg...)
 
+#define dev_WARN_ONCE(dev, condition, format, arg...) ({\
+	lx_printf("dev_WARN_ONCE: "  format, ## arg); \
+	!!condition; \
+})
 
 #if DEBUG_LINUX_PRINTK
 #define dev_dbg(dev, format, arg...)  lx_printf("dev_dbg: " format, ## arg)
@@ -951,7 +963,8 @@ struct device_driver {
 	struct bus_type *bus;
 	struct module   *owner;
 	const char      *mod_name;
-	const struct of_device_id  *of_match_table;
+	const struct of_device_id   *of_match_table;
+	const struct acpi_device_id *acpi_match_table;
 	int            (*probe)  (struct device *dev);
 	int            (*remove) (struct device *dev);
 
@@ -1171,10 +1184,18 @@ void  dma_free_coherent(struct device *, size_t, void *, dma_addr_t);
 #define DMA_BIT_MASK(n) (((n) == 64) ? ~0ULL : ((1ULL<<(n))-1))
 static inline int dma_set_coherent_mask(struct device *dev, u64 mask) { dev->coherent_dma_mask = mask; return 0; }
 static inline int dma_set_mask(struct device *dev, u64 mask) { *dev->dma_mask = mask; return 0; }
+
 static inline int dma_coerce_mask_and_coherent(struct device *dev, u64 mask)
 {
 	dma_set_mask(dev, mask);
 	return dma_set_coherent_mask(dev, mask);
+}
+
+static inline int dma_set_mask_and_coherent(struct device *dev, u64 mask)
+{
+	dma_set_mask(dev, mask);
+	dma_set_coherent_mask(dev, mask);
+	return 0;
 }
 
 /*********************
@@ -3062,6 +3083,10 @@ bool of_property_read_bool(const struct device_node *np, const char *propname);
 
 int device_property_read_string(struct device *dev, const char *propname,
                                 const char **val);
+bool device_property_read_bool(struct device *dev, const char *propname);
+int  device_property_read_u8(struct device *dev, const char *propname, u8 *val);
+int  device_property_read_u32(struct device *dev, const char *propname, u32 *val);
+
 
 /************************
  ** linux/radix-tree.h **
@@ -3075,6 +3100,7 @@ void *radix_tree_delete(struct radix_tree_root *, unsigned long);
 int   radix_tree_preload(gfp_t gfp_mask);
 void  radix_tree_preload_end(void);
 int   radix_tree_maybe_preload(gfp_t gfp_mask);
+
 
 /**********************************
  ** Platform specific defintions **
@@ -3200,6 +3226,10 @@ static inline void trace_xhci_dbg_cancel_urb(struct va_format *v) { }
 static inline void trace_xhci_dbg_reset_ep(struct va_format *v) { }
 static inline void trace_xhci_dbg_quirks(struct va_format *v) { }
 static inline void trace_xhci_dbg_address(struct va_format *v) { }
+
+static inline void trace_dwc3_readl(struct va_format *v) { }
+static inline void trace_dwc3_writel(struct va_format *v) { }
+static inline void trace_dwc3_core(struct va_format *v) { }
 
 void backtrace(void);
 

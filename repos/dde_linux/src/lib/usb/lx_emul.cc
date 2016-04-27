@@ -204,7 +204,11 @@ int scnprintf(char *buf, size_t size, const char *fmt, ...)
 	return sc.len();
 }
 
-int    strcmp(const char *s1, const char *s2) { return Genode::strcmp(s1, s2); }
+int    strcmp(const char *s1, const char *s2)
+{
+	printk("%s:%d from %p\n", __func__, __LINE__, __builtin_return_address(0));
+	return Genode::strcmp(s1, s2);
+}
 size_t strlen(const char *s) { return Genode::strlen(s); }
 
 

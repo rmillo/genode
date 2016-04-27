@@ -1100,6 +1100,13 @@ int  phy_ethtool_gset(struct phy_device *phydev, struct ethtool_cmd *cmd) { TRAC
 int  phy_start_aneg(struct phy_device *phydev) { TRACE; return 0; }
 void phy_start(struct phy_device *phydev) { TRACE; }
 void phy_stop(struct phy_device *phydev) { TRACE; }
+int phy_init(struct phy *phy) { TRACE; return 0; }
+int phy_exit(struct phy *phy) { TRACE; return 0; }
+int phy_power_on(struct phy *phy) { TRACE; return 0; }
+int phy_power_off(struct phy *phy) { TRACE; return 0; }
+int  phy_create_lookup(struct phy *phy, const char *con_id, const char *dev_id) { TRACE; return 0; }
+void phy_remove_lookup(struct phy *phy, const char *con_id, const char *dev_id) { TRACE; }
+
 int  genphy_resume(struct phy_device *phydev) { TRACE; return 0; }
 
 struct phy_device * phy_connect(struct net_device *dev, const char *bus_id,
@@ -1113,6 +1120,8 @@ struct usb_phy *devm_usb_get_phy_dev(struct device *dev, u8 index) { TRACE; retu
 
 struct usb_phy *usb_get_phy_dev(struct device *dev, u8 index) { TRACE; return 0; }
 void   usb_put_phy(struct usb_phy *x) { TRACE; }
+
+struct phy *devm_phy_get(struct device *dev, const char *string) { TRACE; return 0; }
 
 
 /****************
@@ -1128,6 +1137,18 @@ int      of_platform_populate(struct device_node *root, const struct of_device_i
 int      of_device_is_compatible(const struct device_node *device, const char *compat) { TRACE; return 1; }
 
 
+/**********************
+ ** linux/property.h **
+ **********************/
+
+bool device_property_read_bool(struct device *dev, const char *propname) { TRACE; return false; }
+int  device_property_read_u8(struct device *dev, const char *propname, u8 *val) { TRACE; return 0; }
+
+int device_property_read_string(struct device *dev, const char *propname,
+                                const char **val) { TRACE; *val = 0; return -EINVAL; }
+int  device_property_read_u32(struct device *dev, const char *propname, u32 *val) { TRACE; return 0; }
+
+
 /******************************
  ** drivers/usb/dwc3/debug.h **
  ******************************/
@@ -1136,6 +1157,8 @@ struct dwc3;
 
 int dwc3_debugfs_init(struct dwc3 *d){ SKIP;  return 0;  }
 void dwc3_debugfs_exit(struct dwc3 *d) { SKIP; }
+void dwc3_trace(void (*trace)(struct va_format *), const char *fmt, ...) { SKIP; }
+
 
 /**************************
  ** linux/power_supply.h **

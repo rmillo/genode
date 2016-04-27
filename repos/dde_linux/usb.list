@@ -50,10 +50,12 @@ linux-4.4.3/drivers/usb/core/usb.c
 linux-4.4.3/drivers/usb/dwc3/core.h
 linux-4.4.3/drivers/usb/dwc3/core.c
 linux-4.4.3/drivers/usb/dwc3/debug.h
+linux-4.4.3/drivers/usb/dwc3/dwc3-exynos.c
 linux-4.4.3/drivers/usb/dwc3/gadget.h
 linux-4.4.3/drivers/usb/dwc3/host.c
 linux-4.4.3/drivers/usb/dwc3/io.h
 linux-4.4.3/drivers/usb/dwc3/platform_data.h
+linux-4.4.3/drivers/usb/dwc3/trace.h
 linux-4.4.3/drivers/usb/host/ehci-dbg.c
 linux-4.4.3/drivers/usb/host/ehci-exynos.c
 linux-4.4.3/drivers/usb/host/ehci.h
@@ -79,6 +81,8 @@ linux-4.4.3/drivers/usb/host/xhci-ext-caps.h
 linux-4.4.3/drivers/usb/host/xhci.h
 linux-4.4.3/drivers/usb/host/xhci-hub.c
 linux-4.4.3/drivers/usb/host/xhci-mem.c
+linux-4.4.3/drivers/usb/host/xhci-mvebu.h
+linux-4.4.3/drivers/usb/host/xhci-rcar.h
 linux-4.4.3/drivers/usb/host/xhci.c
 linux-4.4.3/drivers/usb/host/xhci-pci.c
 linux-4.4.3/drivers/usb/host/xhci-plat.c
