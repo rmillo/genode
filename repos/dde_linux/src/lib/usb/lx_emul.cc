@@ -521,17 +521,7 @@ int fls(int x)
  ** linux/delay.h **
  *******************/
 
-static Timer::Connection _timer;
-
-
-void udelay(unsigned long usecs)
-{
-	_timer.usleep(usecs);
-}
-
-
-void msleep(unsigned int msecs) { _timer.msleep(msecs); }
-void mdelay(unsigned long msecs) { msleep(msecs); }
+#include <lx_emul/impl/delay.h>
 
 
 /*********
@@ -943,17 +933,41 @@ signed long schedule_timeout_uninterruptible(signed long timeout)
 #include <lx_emul/impl/completion.h>
 
 
+static void _completion_timeout(unsigned long t)
+{
+	Lx::Task *task = (Lx::Task *)t;
+	task->unblock();
+}
+
+
 long __wait_completion(struct completion *work, unsigned long timeout)
 {
-	//TODO: implement timeout
+	timer_list t;
+	unsigned long j = timeout ? jiffies + timeout : 0;
+
+	if (timeout) {
+		setup_timer(&t, _completion_timeout, (unsigned long)Lx::scheduler().current());
+		mod_timer(&t, timeout);
+	}
+
 	while (!work->done) {
+
+		if (j && j <= jiffies) {
+			lx_log(1, "timeout jiffies %lu", jiffies);
+			return 0;
+		}
+
 		Lx::Task *task = Lx::scheduler().current();
 		work->task = (void *)task;
 		task->block_and_schedule();
 	}
+
+	if (timeout)
+		del_timer(&t);
+
 	work->done = 0;
 
-	return 1;
+	return j ? j - jiffies : 1;
 }
 
 
@@ -973,7 +987,7 @@ void tasklet_init(struct tasklet_struct *t, void (*f)(unsigned long), unsigned l
 
 void tasklet_schedule(struct tasklet_struct *tasklet)
 {
-	Lx::Work *lx_work = (Lx::Work *)system_wq->task;
+	Lx::Work *lx_work = (Lx::Work *)tasklet_wq->task;
 	lx_work->schedule_tasklet(tasklet);
 	lx_work->unblock();
 }

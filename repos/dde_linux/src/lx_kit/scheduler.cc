@@ -202,7 +202,7 @@ Lx::Task::Task(void (*func)(void*), void *arg, char const *name,
 	scheduler.add(this);
 
 	if (verbose)
-		PDBGV("name: '%s' func: %p arg: %p prio: %u t: %p", name, func, arg, priority, this);
+		PDBG("name: '%s' func: %p arg: %p prio: %u t: %p", name, func, arg, priority, this);
 }
 
 

@@ -2904,6 +2904,8 @@ u16 ethtool_adv_to_mmd_eee_adv_t(u32 adv);
  ** linux/inerrupt.h **
  **********************/
 
+extern struct workqueue_struct *tasklet_wq;
+
 struct tasklet_struct
 {
 	void (*func)(unsigned long);

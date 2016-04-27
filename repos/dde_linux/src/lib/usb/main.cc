@@ -51,6 +51,7 @@ extern "C" void start_input_service(void *ep, void *services);
 
 struct workqueue_struct *system_power_efficient_wq;
 struct workqueue_struct *system_wq;
+struct workqueue_struct *tasklet_wq;
 
 void breakpoint() { PDBG("BREAK"); }
 
@@ -62,6 +63,8 @@ static void run_linux(void *s)
 
 	system_power_efficient_wq = alloc_workqueue("system_power_efficient_wq", 0, 0);
 	system_wq                 = alloc_workqueue("system_wq", 0, 0);
+	tasklet_wq                = alloc_workqueue("tasklet_wq", 0, 0);
+
 	/*
 	 * The RAW driver is initialized first to make sure that it doesn't miss
 	 * notifications about added devices.
