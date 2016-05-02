@@ -2356,7 +2356,8 @@ struct scsi_device
 	unsigned short        last_queue_full_count;  /* scsi_track_queue_full() */
 	unsigned long         last_queue_full_time;   /* last queue full time */
 
-	unsigned int          id, lun, channel;
+	unsigned int          id, channel;
+	u64                   lun;
 	char                  type;
 	char                  scsi_level;
 	unsigned char         inquiry_len;            /* valid bytes in 'inquiry' */
