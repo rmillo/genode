@@ -18,7 +18,6 @@
 #include <platform_session/connection.h>
 
 /* emulation */
-#include <platform/platform.h>
 #include <platform.h>
 #include <lx_emul.h>
 

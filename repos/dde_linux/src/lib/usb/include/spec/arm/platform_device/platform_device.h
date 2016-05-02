@@ -20,11 +20,13 @@
 #include <platform_device/device.h>
 
 #include <irq_session/connection.h>
+#include <util/list.h>
 #include <util/volatile_object.h>
+
 
 namespace Platform { struct Device; }
 
-struct Platform::Device : Platform::Abstract_device
+struct Platform::Device : Platform::Abstract_device, Genode::List<Device>::Element
 {
 	unsigned                                             irq_num;
 	Genode::Lazy_volatile_object<Genode::Irq_connection> irq_connection;
@@ -46,6 +48,25 @@ struct Platform::Device : Platform::Abstract_device
 	{
 		PERR("%s: not implemented", __PRETTY_FUNCTION__);
 		return Genode::Io_mem_session_capability();
+	}
+
+	static Genode::List<Device> &list()
+	{
+		static Genode::List<Device> l;
+		return l;
+	}
+
+	static Device &create(unsigned irq_num)
+	{
+		Device *d;
+		for (d = list().first(); d; d = d->next())
+			if (d->irq_num == irq_num)
+				return *d;
+
+		d = new (Genode::env()->heap()) Device(irq_num);
+		list().insert(d);
+
+		return *d;
 	}
 };
 

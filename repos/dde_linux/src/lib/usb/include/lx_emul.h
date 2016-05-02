@@ -43,6 +43,12 @@
 /* lx_printf */
 #include <lx_emul/printf.h>
 
+static inline void bt()
+{
+	lx_printf("BT: 0x%p\n", __builtin_return_address(0));
+}
+
+
 /*******************
  ** linux/sizes.h **
  *******************/
@@ -237,6 +243,7 @@ enum {
 	ENOEXEC       = 8,
 	EISDIR        = 21,
 	EXFULL        = 52,
+	ERESTART      = 53,
 	ESHUTDOWN     = 58,
 	ECOMM         = 70,
 	EIDRM         = 82,
@@ -293,6 +300,7 @@ int   kstrtoul(const char *s, unsigned int base, unsigned long *res);
 
 int  strict_strtoul(const char *s, unsigned int base, unsigned long *res);
 long simple_strtoul(const char *cp, char **endp, unsigned int base);
+long simple_strtol(const char *,char **,unsigned int);
 
 int hex_to_bin(char ch);
 
@@ -308,6 +316,12 @@ int sprintf(char *buf, const char *fmt, ...);
 int sscanf(const char *, const char *, ...);
 int scnprintf(char *buf, size_t size, const char *fmt, ...);
 
+
+/*********************
+ ** linux/preempt.h **
+ *********************/
+
+bool in_softirq(void);
 
 /*********************
  ** linux/jiffies.h **

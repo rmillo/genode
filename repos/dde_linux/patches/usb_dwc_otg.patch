@@ -1,0 +1,25 @@
+diff --git a/drivers/usb/host/dwc_otg/dwc_otg/dwc_otg_cil_intr.c b/drivers/usb/host/dwc_otg/dwc_otg/dwc_otg_cil_intr.c
+index 065807f..d1e8512 100644
+--- a/drivers/usb/host/dwc_otg/dwc_otg/dwc_otg_cil_intr.c
++++ b/drivers/usb/host/dwc_otg/dwc_otg/dwc_otg_cil_intr.c
+@@ -1407,6 +1407,7 @@ int32_t dwc_otg_handle_common_intr(void *dev)
+ 	int retval = 0;
+ 	gintsts_data_t gintsts;
+ 	gintmsk_data_t gintmsk_reenable = { .d32 = 0 };
++	gintmsk_data_t gintmsk;
+ 	gpwrdn_data_t gpwrdn = {.d32 = 0 };
+ 	dwc_otg_device_t *otg_dev = dev;
+ 	dwc_otg_core_if_t *core_if = otg_dev->core_if;
+@@ -1536,6 +1537,12 @@ int32_t dwc_otg_handle_common_intr(void *dev)
+ //		fiq_print(FIQDBG_INT, otg_dev->hcd->fiq_state, "%08x", gintsts.d32);
+ //		fiq_print(FIQDBG_INT, otg_dev->hcd->fiq_state, "%08x", gintmsk_reenable.d32);
+ 		if (retval) {
++			gintmsk.d32 = DWC_READ_REG32(&core_if->core_global_regs->gintmsk);
++			/* forward port interrupt to HCD handler */
++			if (gintmsk.b.portintr) {
++				gintmsk_reenable.b.portintr = 1;
++			}
++
+ 			DWC_WRITE_REG32(&core_if->core_global_regs->gintmsk, gintmsk_reenable.d32);
+ 		}
+ 

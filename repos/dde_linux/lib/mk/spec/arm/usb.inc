@@ -1,6 +1,6 @@
 include $(REP_DIR)/lib/mk/usb.inc
 
-SRC_CC  += platform_device.c platform_generic.cc
+SRC_CC  += platform_device.cc platform_generic.cc
 
 INC_DIR += $(LIB_INC_DIR)/spec/arm
 INC_DIR += $(REP_DIR)/src/include/spec/arm
