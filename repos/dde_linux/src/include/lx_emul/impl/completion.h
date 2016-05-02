@@ -72,8 +72,9 @@ void __wait_event(wait_queue_head_t wq)
 {
 	Wait_list *list = static_cast<Wait_list *>(wq.list);
 	if (!list) {
-		PERR("__wait_event(): empty list in wq: %p", &wq);
-		Genode::sleep_forever();
+		PWRN("__wait_event():dd empty list in wq: %p", &wq);
+		init_waitqueue_head(&wq);
+		list = static_cast<Wait_list *>(wq.list);
 	}
 
 	Lx::Task *task = Lx::scheduler().current();
