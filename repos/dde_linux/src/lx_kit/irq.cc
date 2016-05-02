@@ -147,7 +147,7 @@ class Lx_kit::Irq : public Lx::Irq
 
 					/* report IRQ to all clients */
 					for (Handler *h = _handler.first(); h; h = h->next()) {
-						if ((handled = h->handle())) break;
+						h->handle();
 					}
 
 					_irq_sess.ack_irq();
