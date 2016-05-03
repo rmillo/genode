@@ -395,3 +395,124 @@ index 43576ed..2b13b4e 100644
  	if (!us->cr)
  		return -ENOMEM;
  
+--- a/drivers/hid/hid-multitouch.c
++++ b/drivers/hid/hid-multitouch.c
+@@ -325,7 +325,7 @@
+ 	if (td->mtclass.name != MT_CLS_WIN_8)
+ 		return;
+ 
+-	buf = hid_alloc_report_buf(report, GFP_KERNEL);
++	buf = hid_alloc_report_buf(report, GFP_NOIO);
+ 	if (!buf)
+ 		return;
+ 
+@@ -912,7 +912,7 @@
+ 	if (r) {
+ 		if (cls->quirks & MT_QUIRK_FORCE_GET_FEATURE) {
+ 			report_len = hid_report_len(r);
+-			buf = hid_alloc_report_buf(r, GFP_KERNEL);
++			buf = hid_alloc_report_buf(r, GFP_NOIO);
+ 			if (!buf) {
+ 				hid_err(hdev, "failed to allocate buffer for report\n");
+ 				return;
+@@ -1043,7 +1043,7 @@
+ 	if (suffix) {
+ 		name = devm_kzalloc(&hi->input->dev,
+ 				    strlen(hdev->name) + strlen(suffix) + 2,
+-				    GFP_KERNEL);
++				    GFP_NOIO);
+ 		if (name) {
+ 			sprintf(name, "%s %s", hdev->name, suffix);
+ 			hi->input->name = name;
+@@ -1096,7 +1096,7 @@
+ 		 */
+ 		hdev->quirks |= HID_QUIRK_NO_INIT_REPORTS;
+ 
+-	td = devm_kzalloc(&hdev->dev, sizeof(struct mt_device), GFP_KERNEL);
++	td = devm_kzalloc(&hdev->dev, sizeof(struct mt_device), GFP_NOIO);
+ 	if (!td) {
+ 		dev_err(&hdev->dev, "cannot allocate multitouch data\n");
+ 		return -ENOMEM;
+@@ -1110,7 +1110,7 @@
+ 	hid_set_drvdata(hdev, td);
+ 
+ 	td->fields = devm_kzalloc(&hdev->dev, sizeof(struct mt_fields),
+-				  GFP_KERNEL);
++				  GFP_NOIO);
+ 	if (!td->fields) {
+ 		dev_err(&hdev->dev, "cannot allocate multitouch fields data\n");
+ 		return -ENOMEM;
+--- a/drivers/hid/wacom_sys.c
++++ b/drivers/hid/wacom_sys.c
+@@ -124,7 +124,7 @@
+ 		/* leave touch_max as is if predefined */
+ 		if (!features->touch_max) {
+ 			/* read manually */
+-			data = kzalloc(2, GFP_KERNEL);
++			data = kzalloc(2, GFP_NOIO);
+ 			if (!data)
+ 				break;
+ 			data[0] = field->report->id;
+@@ -328,7 +328,7 @@
+ 	unsigned char *rep_data;
+ 	int error = -ENOMEM, limit = 0;
+ 
+-	rep_data = kzalloc(length, GFP_KERNEL);
++	rep_data = kzalloc(length, GFP_NOIO);
+ 	if (!rep_data)
+ 		return error;
+ 
+@@ -530,7 +530,7 @@
+ 
+ 	data = wacom_get_hdev_data(hdev);
+ 	if (!data) {
+-		data = kzalloc(sizeof(struct wacom_hdev_data), GFP_KERNEL);
++		data = kzalloc(sizeof(struct wacom_hdev_data), GFP_NOIO);
+ 		if (!data) {
+ 			retval = -ENOMEM;
+ 			goto out;
+@@ -595,7 +595,7 @@
+ 		report_id = WAC_CMD_WL_LED_CONTROL;
+ 		buf_size = 13;
+ 	}
+-	buf = kzalloc(buf_size, GFP_KERNEL);
++	buf = kzalloc(buf_size, GFP_NOIO);
+ 	if (!buf)
+ 		return -ENOMEM;
+ 
+@@ -648,7 +648,7 @@
+ 	int i, retval;
+ 	const unsigned chunk_len = len / 4; /* 4 chunks are needed to be sent */
+ 
+-	buf = kzalloc(chunk_len + 3 , GFP_KERNEL);
++	buf = kzalloc(chunk_len + 3 , GFP_NOIO);
+ 	if (!buf)
+ 		return -ENOMEM;
+ 
+@@ -1176,7 +1176,7 @@
+ 
+ 	wacom_wac->serial[index] = serial;
+ 
+-	buf = kzalloc(WAC_REMOTE_SERIAL_MAX_STRLEN, GFP_KERNEL);
++	buf = kzalloc(WAC_REMOTE_SERIAL_MAX_STRLEN, GFP_NOIO);
+ 	if (!buf)
+ 		return -ENOMEM;
+ 	snprintf(buf, WAC_REMOTE_SERIAL_MAX_STRLEN, "%d", serial);
+@@ -1222,7 +1222,7 @@
+ 	unsigned char *buf;
+ 	int retval;
+ 
+-	buf = kzalloc(buf_size, GFP_KERNEL);
++	buf = kzalloc(buf_size, GFP_NOIO);
+ 	if (!buf)
+ 		return -ENOMEM;
+ 
+@@ -1705,7 +1705,7 @@
+ 	/* hid-core sets this quirk for the boot interface */
+ 	hdev->quirks &= ~HID_QUIRK_NOGET;
+ 
+-	wacom = kzalloc(sizeof(struct wacom), GFP_KERNEL);
++	wacom = kzalloc(sizeof(struct wacom), GFP_NOIO);
+ 	if (!wacom)
+ 		return -ENOMEM;
+ 

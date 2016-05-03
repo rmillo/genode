@@ -208,6 +208,5 @@ PATCH_OPT(patches/usb_evdev.patch)       := $(USB_OPT)
 PATCH_OPT(patches/usb_dwc_otg.patch)     := $(USB_OPT)
 PATCH_OPT(patches/usb_mem.patch)         := $(USB_OPT)
 PATCH_OPT(patches/usb_usbnet.patch)      := $(USB_OPT)
-PATCH_OPT(patches/usb_wacom.patch)       := $(USB_OPT)
 
 # vi: set ft=make :
