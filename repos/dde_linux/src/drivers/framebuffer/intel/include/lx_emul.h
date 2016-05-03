@@ -38,7 +38,7 @@ void atomic_set_mask(unsigned int mask, atomic_t *v);
 
 typedef unsigned long kernel_ulong_t;
 typedef unsigned int  u_int;
-
+typedef int           clockid_t;
 
 /************************
  ** uapi/linux/types.h **
@@ -341,9 +341,9 @@ void yield(void);
  ** linux/completion.h **
  ************************/
 
-struct completion { unsigned done; };
+struct completion { unsigned done; void *task; };
 
-void __wait_completion(struct completion *work);
+long __wait_completion(struct completion *work, unsigned long timeout);
 void complete(struct completion *); /* i2c-core.c */
 void init_completion(struct completion *x);
 void wait_for_completion(struct completion *);

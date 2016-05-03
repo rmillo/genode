@@ -655,21 +655,10 @@ void put_page(struct page *page)
 	TRACE_AND_STOP;
 }
 
-bool queue_work(struct workqueue_struct *wq, struct work_struct *work)
-{
-	TRACE_AND_STOP;
-	return -1;
-}
-
 int release_resource(struct resource *r)
 {
 	TRACE_AND_STOP;
 	return -1;
-}
-
-void remove_wait_queue(wait_queue_head_t *, wait_queue_t *)
-{
-	TRACE_AND_STOP;
 }
 
 int request_resource(struct resource *root, struct resource *)

@@ -553,9 +553,10 @@ struct workqueue_struct *alloc_ordered_workqueue(char const *name , unsigned int
 #include <lx_emul/impl/wait.h>
 
 
-void __wait_completion(struct completion *work)
+long __wait_completion(struct completion *work, unsigned long timeout)
 {
 	TRACE_AND_STOP;
+	return 1;
 }
 
 
