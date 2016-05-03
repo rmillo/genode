@@ -121,8 +121,7 @@ void *Lx::ioremap(addr_t phys_addr, unsigned long size,
 	PLOG("ioremap: mapped phys 0x%lx (size %lx) to virt 0x%lx",
 	     (long)phys_addr, (long)size, (long)io_mem->virt());
 
-	addr_t const sub_page_offset = phys_addr & 0xfff;
-	return (void *)(io_mem->virt() + sub_page_offset);
+	return (void *)io_mem->virt();
 }
 
 void Lx::iounmap(volatile void * virt)
