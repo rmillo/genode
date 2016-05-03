@@ -74,7 +74,7 @@ class Lx::Pci_dev_registry
 				return Genode::Io_mem_session_client(io_mem_cap).dataspace();
 			}
 
-			PERR("Device using i/o memory of address %zx is unknown", phys);
+			PERR("Device using i/o memory of address %lx is unknown", phys);
 			return Genode::Io_mem_dataspace_capability();
 		}
 

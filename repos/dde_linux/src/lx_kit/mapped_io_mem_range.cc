@@ -107,7 +107,7 @@ void *Lx::ioremap(addr_t phys_addr, unsigned long size,
 		                               size, offset);
 
 	if (!ds_cap.valid()) {
-		PERR("Failed to request I/O memory: [%zx,%lx)", phys_addr,
+		PERR("Failed to request I/O memory: [%lx,%lx)", phys_addr,
 		     phys_addr + size);
 		return nullptr;
 	}
