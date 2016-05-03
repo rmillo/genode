@@ -735,10 +735,6 @@ int kthread_stop(struct task_struct *k);
 
 struct task_struct *kthread_run(int (*)(void *), void *, const char *, ...);
 
-struct task_struct *kthread_create(int (*threadfn)(void *data),
-                                   void *data,
-                                   const char namefmt[], ...);
-
 
 /**********************
  ** linux/notifier.h **

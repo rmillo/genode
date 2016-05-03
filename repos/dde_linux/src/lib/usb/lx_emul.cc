@@ -638,29 +638,17 @@ int dma_map_sg_attrs(struct device *dev, struct scatterlist *sg,
 
 struct task_struct *kthread_run(int (*fn)(void *), void *arg, const char *n, ...)
 {
+	/*
+	 * This is just called for delayed device scanning (see
+	 * 'drivers/usb/storage/usb.c')
+	 */
 	lx_log(DEBUG_THREAD, "Run %s", n);
+
 	new (Genode::env()->heap()) Lx::Task((void (*)(void *))fn, arg, n,
 	                                     Lx::Task::PRIORITY_2,
 	                                     Lx::scheduler());
 	return 0;
 }
-
-
-struct task_struct *kthread_create(int (*threadfn)(void *data),
-                                   void *data,
-                                   const char namefmt[], ...)
-{
-	/*
-	 * This is just called for delayed device scanning (see
-	 * 'drivers/usb/storage/usb.c')
-	 */
-	lx_log(DEBUG_THREAD, "Create %s", namefmt);
-	PDBG("IMPLEMENT ME!");
-	//Routine::add(threadfn, data, namefmt);
-	//TODO: TASK
-	return 0;
-}
-
 
 /*************************
  ** linux/scatterlist.h **
