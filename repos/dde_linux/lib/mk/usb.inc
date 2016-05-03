@@ -57,9 +57,8 @@ SRC_C += usb/common/common.c
 # USB hid
 SRC_C += $(addprefix hid/usbhid/, hid-core.c hid-quirks.c)
 SRC_C += $(addprefix hid/,        hid-core.c hid-generic.c hid-input.c \
-                                  hid-cherry.c hid-microsoft.c hid-multitouch.c)
-# XXX: @alexab comment back in
-#                                  wacom_sys.c wacom_wac.c)
+                                  hid-cherry.c hid-microsoft.c hid-multitouch.c \
+                                  wacom_sys.c wacom_wac.c)
 SRC_C += $(addprefix input/,      evdev.c input.c input-mt.c)
 
 # USB storage

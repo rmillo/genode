@@ -275,6 +275,7 @@ int   hex2bin(u8 *dst, const char *src, size_t count);
 char *kasprintf(gfp_t gfp, const char *fmt, ...);
 int   kstrtouint(const char *s, unsigned int base, unsigned int *res);
 int   kstrtoul(const char *s, unsigned int base, unsigned long *res);
+int   kstrtou8(const char *s, unsigned int base, u8 *res);
 
 #define clamp(val, min, max) ({           \
 	typeof(val) __val = (val);              \
@@ -808,6 +809,12 @@ struct attribute {
 	mode_t      mode;
 };
 
+struct kobj_attribute {
+	struct attribute attr;
+	void * show;
+	void * store;
+};
+
 struct attribute_group {
 	const char        *name;
 	mode_t           (*is_visible)(struct kobject *, struct attribute *, int);
@@ -853,6 +860,7 @@ void sysfs_remove_group(struct kobject *kobj,
 int sysfs_create_link(struct kobject *kobj, struct kobject *target,
                       const char *name);
 void sysfs_remove_link(struct kobject *kobj, const char *name);
+int sysfs_create_files(struct kobject *kobj, const struct attribute **ptr);
 
 
 /****************

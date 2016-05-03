@@ -1,8 +1,15 @@
-diff --git a/drivers/hid/wacom_sys.c b/drivers/hid/wacom_sys.c
-index e06af5b..1ad489a 100644
 --- a/drivers/hid/wacom_sys.c
 +++ b/drivers/hid/wacom_sys.c
-@@ -328,7 +328,7 @@ static int wacom_set_device_mode(struct hid_device *hdev, int report_id,
+@@ -124,7 +124,7 @@
+ 		/* leave touch_max as is if predefined */
+ 		if (!features->touch_max) {
+ 			/* read manually */
+-			data = kzalloc(2, GFP_KERNEL);
++			data = kzalloc(2, GFP_NOIO);
+ 			if (!data)
+ 				break;
+ 			data[0] = field->report->id;
+@@ -328,7 +328,7 @@
  	unsigned char *rep_data;
  	int error = -ENOMEM, limit = 0;
  
@@ -10,4 +17,58 @@ index e06af5b..1ad489a 100644
 +	rep_data = kzalloc(length, GFP_NOIO);
  	if (!rep_data)
  		return error;
+ 
+@@ -530,7 +530,7 @@
+ 
+ 	data = wacom_get_hdev_data(hdev);
+ 	if (!data) {
+-		data = kzalloc(sizeof(struct wacom_hdev_data), GFP_KERNEL);
++		data = kzalloc(sizeof(struct wacom_hdev_data), GFP_NOIO);
+ 		if (!data) {
+ 			retval = -ENOMEM;
+ 			goto out;
+@@ -595,7 +595,7 @@
+ 		report_id = WAC_CMD_WL_LED_CONTROL;
+ 		buf_size = 13;
+ 	}
+-	buf = kzalloc(buf_size, GFP_KERNEL);
++	buf = kzalloc(buf_size, GFP_NOIO);
+ 	if (!buf)
+ 		return -ENOMEM;
+ 
+@@ -648,7 +648,7 @@
+ 	int i, retval;
+ 	const unsigned chunk_len = len / 4; /* 4 chunks are needed to be sent */
+ 
+-	buf = kzalloc(chunk_len + 3 , GFP_KERNEL);
++	buf = kzalloc(chunk_len + 3 , GFP_NOIO);
+ 	if (!buf)
+ 		return -ENOMEM;
+ 
+@@ -1176,7 +1176,7 @@
+ 
+ 	wacom_wac->serial[index] = serial;
+ 
+-	buf = kzalloc(WAC_REMOTE_SERIAL_MAX_STRLEN, GFP_KERNEL);
++	buf = kzalloc(WAC_REMOTE_SERIAL_MAX_STRLEN, GFP_NOIO);
+ 	if (!buf)
+ 		return -ENOMEM;
+ 	snprintf(buf, WAC_REMOTE_SERIAL_MAX_STRLEN, "%d", serial);
+@@ -1222,7 +1222,7 @@
+ 	unsigned char *buf;
+ 	int retval;
+ 
+-	buf = kzalloc(buf_size, GFP_KERNEL);
++	buf = kzalloc(buf_size, GFP_NOIO);
+ 	if (!buf)
+ 		return -ENOMEM;
+ 
+@@ -1705,7 +1705,7 @@
+ 	/* hid-core sets this quirk for the boot interface */
+ 	hdev->quirks &= ~HID_QUIRK_NOGET;
+ 
+-	wacom = kzalloc(sizeof(struct wacom), GFP_KERNEL);
++	wacom = kzalloc(sizeof(struct wacom), GFP_NOIO);
+ 	if (!wacom)
+ 		return -ENOMEM;
  

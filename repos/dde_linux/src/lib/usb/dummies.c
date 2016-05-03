@@ -54,6 +54,7 @@ void might_sleep() { SKIP; }
 char *kasprintf(gfp_t gfp, const char *fmt, ...) { TRACE; return NULL; }
 int kstrtouint(const char *s, unsigned int base, unsigned int *res) { TRACE; return 0; }
 int kstrtoul(const char *s, unsigned int base, unsigned long *res) { TRACE; return 0; }
+int kstrtou8(const char *s, unsigned int base, u8 *x) { TRACE; return 1; }
 int sprintf(char *buf, const char *fmt, ...) { TRACE; return 0; }
 int sscanf(const char *b, const char *s, ...) { TRACE; return 0; }
 int scnprintf(char *buf, size_t size, const char *fmt, ...);
@@ -281,6 +282,8 @@ void sysfs_remove_group(struct kobject *kobj,
 int sysfs_create_link(struct kobject *kobj, struct kobject *target,
                       const char *name) { TRACE; return 0; }
 void sysfs_remove_link(struct kobject *kobj, const char *name) { TRACE; }
+
+int sysfs_create_files(struct kobject *kobj, const struct attribute **attr) { TRACE; return 1; }
 
 int fasync_helper(int fd, struct file * filp, int on, struct fasync_struct **fapp) { TRACE; return 0; }
 
@@ -1170,3 +1173,13 @@ power_supply_register(struct device *parent,  const struct power_supply_desc *de
                       const struct power_supply_config *cfg) { TRACE; return 0; }
 void power_supply_unregister(struct power_supply *psy) { TRACE; }
 int power_supply_powers(struct power_supply *psy, struct device *dev) { TRACE; return 0; }
+void *power_supply_get_drvdata(struct power_supply *psy) { TRACE; return 0; }
+void power_supply_changed(struct power_supply *psy) { TRACE; }
+
+
+/*********************
+ ** linux/kobject.h **
+ *********************/
+
+void kobject_put(struct kobject *kobj) { TRACE; }
+struct kobject *kobject_create_and_add(const char *name, struct kobject *kobj) { TRACE; return 0; }
