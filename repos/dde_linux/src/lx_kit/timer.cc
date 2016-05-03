@@ -30,10 +30,6 @@
 
 namespace Lx_kit { class Timer; }
 
-
-static void run_timer(void *p);
-
-
 class Lx_kit::Timer : public Lx::Timer
 {
 	public:
