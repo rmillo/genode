@@ -24,7 +24,15 @@
 
 #include <lx_emul/impl/io.h>
 
+/**
+ * Quirks
+ */
+extern "C" void __pci_fixup_quirk_usb_early_handoff(void *data);
 
+
+/**
+ * List of pci devices from platform driver
+ */
 class Pci_dev_list
 {
 	private:
@@ -138,6 +146,13 @@ extern "C" int pci_register_driver(struct pci_driver *driver)
 
 		/* register driver at the 'pci_dev' struct */
 		pci_dev->dev.driver = &driver->driver;
+
+		/*
+		 * This quirk handles device handoff from BIOS, since the BIOS may still
+		 * access the USB controller after bootup. For this the ext cap regsiter of
+		 * the PCI config space is checked
+		 */
+		__pci_fixup_quirk_usb_early_handoff(pci_dev);
 
 		/* call probe function of the Linux driver */
 		if (driver->probe(pci_dev, matching_id)) {
@@ -257,6 +272,18 @@ extern "C" int pci_bus_write_config_dword(struct pci_bus *bus, unsigned int, int
 	return 0;
 }
 
+
+extern "C" void *pci_ioremap_bar(struct pci_dev *dev, int bar)
+{
+	using namespace Genode;
+
+	if (bar >= DEVICE_COUNT_RESOURCE || bar < 0)
+		return 0;
+
+	return Lx::ioremap(pci_resource_start(dev, bar),
+	                   pci_resource_len(dev, bar),
+	                   Genode::UNCACHED);
+}
 
 /***********************
  ** linux/interrupt.h **

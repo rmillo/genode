@@ -1736,18 +1736,9 @@ struct pci_fixup {
         PCI_ANY_ID, PCI_ANY_ID, 0, 0
 
 /* quirks */
-#define DECLARE_PCI_FIXUP_SECTION(section, name, vendor, device, class, \
-                                  class_shift, hook)                    \
-        static const struct pci_fixup __pci_fixup_##name __used         \
-        __attribute__((__section__(#section), aligned((sizeof(void *)))))    \
-                = { vendor, device, class, class_shift, hook };
-
 #define DECLARE_PCI_FIXUP_CLASS_FINAL(vendor, device, class,            \
                                          class_shift, hook)             \
-        DECLARE_PCI_FIXUP_SECTION(.pci_fixup_final,                     \
-                vendor##device##hook, vendor, device, class, class_shift, hook)
-
-#define DECLARE_PCI_FIXUP_FINAL(vendor, device, hook)
+                     void __pci_fixup_##hook(void *data) { hook(data); }
 
 #define for_each_pci_dev(d) printk("for_each_pci_dev called\n"); while(0)
 
