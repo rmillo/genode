@@ -266,15 +266,15 @@ int ilog2(u32 n) { return Genode::log2(n); }
 
 void kmem_cache_destroy(struct kmem_cache *cache)
 {
-	kfree(cache);
+	destroy(Genode::env()->heap(), cache);
 }
 
 
 void *kmem_cache_zalloc(struct kmem_cache *cache, gfp_t flags)
 {
 	void *ret;
-
-	ret = kzalloc(cache->size(), flags);
+	ret = kmem_cache_alloc(cache, flags);
+	memset(ret, 0, cache->size());
 	return ret;
 }
 
