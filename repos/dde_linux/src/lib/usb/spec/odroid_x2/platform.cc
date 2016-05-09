@@ -26,7 +26,6 @@
 #include <gpio_session/connection.h>
 
 /* Emulation */
-#include <platform/platform.h>
 #include <lx_emul.h>
 #include <platform.h>
 

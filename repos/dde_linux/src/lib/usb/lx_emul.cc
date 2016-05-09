@@ -37,7 +37,7 @@ namespace Genode {
 }
 
 unsigned long jiffies;
-
+void backtrace() { }
 
 /***********************
  ** Atomic operations **
