@@ -83,6 +83,9 @@ set boot_modules {
 	core init timer usb_drv test-blk-cli
 }
 
+# platform-specific modules
+lappend_if [have_spec gpio]             boot_modules gpio_drv
+
 append_platform_drv_boot_modules
 
 build_boot_image $boot_modules

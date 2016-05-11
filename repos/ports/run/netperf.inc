@@ -15,7 +15,7 @@ if {[have_spec hw_odroid_xu] || [have_spec hw_wand_quad]} {
 }
 
 if {![info exists use_usb_driver]} {
-	set use_usb_driver      [expr [have_spec omap4] || [have_spec arndale] || [have_spec rpi]]
+	set use_usb_driver      [expr [have_spec omap4] || [have_spec arndale] || [have_spec rpi] || [have_spec odroid_x2]]
 }
 set use_nic_driver      [expr !$use_usb_driver && ![have_spec imx53] && !$use_wifi_driver]
 

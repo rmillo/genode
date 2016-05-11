@@ -1,4 +1,4 @@
-set use_usb_driver [expr [have_spec omap4] || [have_spec arndale] || [have_spec rpi]]
+set use_usb_driver [expr [have_spec omap4] || [have_spec arndale] || [have_spec rpi] || [have_spec odroid_x2]]
 set use_nic_driver [expr [have_spec linux] || [expr !$use_usb_driver && ![have_spec imx53] && ![have_spec hw_odroid_xu] && ![have_spec linux] && ![have_spec hw_wand_quad]]]
 
 #
@@ -50,7 +50,7 @@ set config {
 	<start name="test-lxip_udp_echo">
 		<resource name="RAM" quantum="2M"/>
 		<config ld_verbose="yes">
-			<libc stdout="/dev/log" stderr="/dev/log" ip_addr="10.0.2.55" gateway="10.0.2.1" netmask="255.255.255.0">
+			<libc stdout="/dev/log" stderr="/dev/log">
 				<vfs> <dir name="dev"> <log/> </dir> </vfs>
 			</libc>
 		</config>
